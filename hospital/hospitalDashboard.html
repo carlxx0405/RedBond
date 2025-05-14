@@ -69,32 +69,36 @@ const dashboardView = async () => {
   if (!hospital) return "<p>Error loading dashboard.</p>";
 
   const counts = {};
-  const statuses = ['pending', 'approved', 'fulfilled'];
+  const statuses = ['pending', 'approved', 'scheduled', 'fulfilled'];
+  const scheduleMap = {};
+  let allSchedules = [];
+
   for (const status of statuses) {
-    const { count, error } = await supabase
-      .from("blood_requests")
-      .select("*", { count: "exact", head: true })
-      .eq("status", status)
-      .eq("hospital_id", hospital.id);
-    if (error) console.error(`Error fetching ${status} count:`, error);
-    counts[status] = count || 0;
+    if (status === "scheduled" || status === "fulfilled") {
+      const { data, error } = await supabase
+        .from("schedules")
+        .select("id, response_id, status, hospital_id")
+        .eq("hospital_id", hospital.id)
+        .eq("status", status);
+      if (error) console.error(`${status} schedules error:`, error);
+      const filtered = data || [];
+      allSchedules = [...allSchedules, ...filtered];
+      counts[status] = filtered.length;
+
+      filtered.forEach(s => {
+        scheduleMap[s.response_id] = { id: s.id, status: s.status };
+      });
+    } else {
+      const { count, error } = await supabase
+        .from("blood_requests")
+        .select("*", { count: "exact", head: true })
+        .eq("status", status)
+        .eq("hospital_id", hospital.id);
+      if (error) console.error(`${status} count error:`, error);
+      counts[status] = count || 0;
+    }
   }
 
-  // Fetch scheduled entries
-  const { data: schedules, error: scheduledError } = await supabase
-    .from("schedules")
-    .select("id, request_id, status")
-    .eq("hospital_id", hospital.id);
-
-  if (scheduledError) console.error("Error fetching schedules:", scheduledError);
-  counts["scheduled"] = schedules?.length || 0;
-
-  const scheduleMap = {};
-  (schedules || []).forEach(s => {
-    scheduleMap[s.request_id] = { id: s.id, status: s.status };
-  });
-
-  // Fetch all recent blood_requests activity
   const { data: activityFeed } = await supabase
     .from("blood_requests")
     .select("*")
@@ -103,8 +107,6 @@ const dashboardView = async () => {
 
   const activityList = activityFeed.map(req => {
     const schedule = scheduleMap[req.id];
-   const showFulfill = schedule && schedule.status === "scheduled";
-
 
     return `
       <div class="border p-3 rounded-md bg-white shadow-sm">
@@ -113,42 +115,63 @@ const dashboardView = async () => {
           <span class="text-sm text-gray-500">${new Date(req.created_at).toLocaleString()}</span>
         </div>
         <p class="text-sm text-gray-600">Urgency: ${req.urgency} | Status: ${req.status}</p>
-       ${showFulfill
-  ? `<button class="bg-green-600 text-white px-3 py-1 rounded mt-2 hover:bg-green-700"
-      data-action="fulfill-schedule" data-id="${schedule.id}">
-      Fulfill
-    </button>`
-  : schedule && schedule.status === "fulfilled"
-    ? `<p class="text-green-600 text-sm mt-2 font-semibold">Fulfilled</p>`
-    : ""
-}
-
+        ${
+          schedule?.status === "scheduled"
+            ? `<button class="bg-green-600 text-white px-3 py-1 rounded mt-2 hover:bg-green-700"
+                data-action="fulfill-schedule" data-id="${schedule.id}">
+                Fulfill
+              </button>`
+            : schedule?.status === "fulfilled"
+              ? `<p class="text-green-600 text-sm mt-2 font-semibold">Fulfilled</p>`
+              : ""
+        }
       </div>
     `;
   }).join('');
 
+  const orphanSchedules = (allSchedules || []).filter(s => !activityFeed.some(req => req.id === s.response_id));
+
+  const orphanScheduleEntries = orphanSchedules.map(s => `
+    <div class="border p-3 rounded-md bg-white shadow-sm bg-yellow-50">
+      <div class="flex justify-between">
+        <span class="font-semibold">Scheduled Request ID: ${s.response_id}</span>
+      </div>
+      <p class="text-sm text-gray-600">Schedule Status: ${s.status}</p>
+      ${
+        s.status === "scheduled"
+          ? `<button class="bg-green-600 text-white px-3 py-1 rounded mt-2 hover:bg-green-700"
+              data-action="fulfill-schedule" data-id="${s.id}">
+              Fulfill
+            </button>`
+          : `<p class="text-green-600 text-sm mt-2 font-semibold">Fulfilled</p>`
+          
+      }
+    </div>
+  `).join('');
+
   return `
     <h1 class="text-2xl font-semibold mb-6">Hospital Dashboard</h1>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      ${['pending', 'approved', 'scheduled', 'fulfilled'].map(
+      ${statuses.map(
         (s) => `
         <div class="bg-white p-4 rounded shadow">
           <h2 class="font-bold text-lg capitalize">${s} Requests</h2>
-          <p>${counts[s]}</p>
+          <p>${counts[s] ?? 0}</p>
         </div>`
       ).join("")}
-   <div class="bg-white rounded shadow p-4 overflow-y-auto"
-     style="max-height: calc(100vh - 260px); min-height: 200px; width: 1250px;">
-  <h2 class="text-xl font-semibold mb-4">Activity</h2>
-  <div id="activity-feed" class="space-y-3">
-    ${activityList}
-  </div>
-</div>
+    </div>
 
-</div>
-
+    <div class="bg-white rounded shadow p-4 overflow-y-auto"
+      style="max-height: calc(100vh - 260px); min-height: 200px; width: 1250px;">
+      <h2 class="text-xl font-semibold mb-4">Activity</h2>
+      <div id="activity-feed" class="space-y-3">
+        ${activityList}
+        ${orphanScheduleEntries}
+      </div>
+    </div>
   `;
 };
+
 
 
 
