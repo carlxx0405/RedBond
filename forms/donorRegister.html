@@ -163,10 +163,24 @@
 
             if (error) throw error;
 
+            // Fetch the user's role from the 'users' table
+            const { data: profile, error: profileError } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', data.user.id)
+              .single();
+
+            if (profileError) throw profileError;
+
             this.isSuccess = true;
             this.message = "Login successful! Redirecting...";
+
             setTimeout(() => {
-              window.location.href = "../donor/donorDashboard.html";
+              if (profile.role === 'admin') {
+                window.location.href = "../admin/adminDashboard.html";
+              } else {
+                window.location.href = "../donor/donorDashboard.html";
+              }
             }, 1500);
           } catch (error) {
             this.isSuccess = false;
@@ -175,6 +189,7 @@
             this.isLoading = false;
           }
         }
+
       };
     };
   </script>
