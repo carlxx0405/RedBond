@@ -17,10 +17,10 @@
   <aside class="w-64 bg-white border-r shadow-md p-4">
     <h1 class="text-xl font-bold mb-6 text-red-600">RedBond <i class="fas fa-tint"></i></h1>
     <ul class="space-y-2">
-      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'dashboard'"><i class="fas fa-home"></i> Primary Dashboard</button></li>
-      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'requests'"><i class="fas fa-tint"></i> Blood Requests</button></li>
-      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'inventory'"><i class="fas fa-warehouse"></i> Inventory</button></li>
-      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100 text-red-500" @click="tab = 'logout'"><i class="fas fa-power-off"></i> Logout</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-gray-700 hover:text-red-600" @click="tab = 'dashboard'"><i class="fas fa-home"></i> Primary Dashboard</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-gray-700 hover:text-red-600" @click="tab = 'requests'"><i class="fas fa-tint"></i> Blood Requests</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-gray-700 hover:text-red-600" @click="tab = 'inventory'"><i class="fas fa-warehouse"></i> Inventory</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-gray-700 hover:text-red-600" @click="tab = 'logout'"><i class="fas fa-power-off"></i> Logout</button></li>
     </ul>
   </aside>
 
@@ -34,20 +34,20 @@
       <!-- Cards -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white p-4 rounded shadow">
-          <h3 class="text-sm text-red-500">Total Pending Requests</h3>
-          <p class="text-2xl font-bold text-yellow-500">--</p>
+          <h3 class="font-bold">Total Pending Requests</h3>
+          <p class="text-2xl">--</p>
         </div>
         <div class="bg-white p-4 rounded shadow">
-          <h3 class="text-sm text-red-500">Total Active Requests</h3>
-          <p class="text-2xl font-bold text-blue-500">--</p>
+          <h3 class="font-bold">Total Active Requests</h3>
+          <p class="text-2xl">--</p>
         </div>
         <div class="bg-white p-4 rounded shadow">
-          <h3 class="text-sm text-red-500">Total Scheduled Responds</h3>
-          <p class="text-2xl font-bold text-indigo-500">--</p>
+          <h3 class="font-bold">Total Scheduled Responds</h3>
+          <p class="text-2xl">--</p>
         </div>
         <div class="bg-white p-4 rounded shadow">
-          <h3 class="text-sm text-red-500">Total Fulfilled Requests</h3>
-          <p class="text-2xl font-bold text-green-500">--</p>
+          <h3 class="font-bold">Total Fulfilled Requests</h3>
+          <p class="text-2xl">--</p>
         </div>
       </div>
 
