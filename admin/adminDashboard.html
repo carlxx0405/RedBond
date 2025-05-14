@@ -201,22 +201,22 @@
     // Fetch and populate dashboard stats
     async function loadDashboardStats() {
       const { data: pending, error: err1 } = await supabase
-        .from('requests')
+        .from('blood_requests')
         .select('*')
         .eq('status', 'pending');
   
       const { data: active, error: err2 } = await supabase
-        .from('requests')
+        .from('blood_requests')
         .select('*')
         .eq('status', 'active');
   
       const { data: scheduled, error: err3 } = await supabase
-        .from('requests')
+        .from('blood_requests')
         .select('*')
         .eq('status', 'scheduled');
   
       const { data: fulfilled, error: err4 } = await supabase
-        .from('requests')
+        .from('blood_requests')
         .select('*')
         .eq('status', 'fulfilled');
   
