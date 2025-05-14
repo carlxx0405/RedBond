@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ tab: 'dashboard' }" class="h-full bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RedBond Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/alpinejs" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://kit.fontawesome.com/244af82459.js" crossorigin="anonymous"></script>
+  <script type="module" src="../config.js"></script> <!-- Supabase client -->
+</head>
+
+<body class="h-full flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white border-r shadow-md p-4">
+    <h1 class="text-xl font-bold mb-6 text-red-600">RedBond <i class="fas fa-tint"></i></h1>
+    <ul class="space-y-2">
+      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'dashboard'"><i class="fas fa-home"></i> Primary Dashboard</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'requests'"><i class="fas fa-tint"></i> Blood Requests</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'inventory'"><i class="fas fa-warehouse"></i> Inventory</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100 text-red-500" @click="tab = 'logout'"><i class="fas fa-power-off"></i> Logout</button></li>
+    </ul>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 p-6 overflow-y-auto space-y-6">
+
+    <!-- DASHBOARD -->
+    <section x-show="tab === 'dashboard'" x-transition>
+      <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+
+      <!-- Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-sm text-red-500">Total Pending Requests</h3>
+          <p class="text-2xl font-bold text-yellow-500">--</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-sm text-red-500">Total Active Requests</h3>
+          <p class="text-2xl font-bold text-blue-500">--</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-sm text-red-500">Total Scheduled Responds</h3>
+          <p class="text-2xl font-bold text-indigo-500">--</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-sm text-red-500">Total Fulfilled Requests</h3>
+          <p class="text-2xl font-bold text-green-500">--</p>
+        </div>
+      </div>
+
+      <!-- Charts Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div class="bg-white p-4 rounded shadow">
+          <h4 class="font-semibold mb-2">Donor Summary</h4>
+          <canvas id="donorChart"></canvas>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h4 class="font-semibold mb-2">Hospital Summary</h4>
+          <div id="hospitalCard"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BLOOD REQUESTS -->
+    <section x-show="tab === 'requests'" x-transition>
+      <h2 class="text-2xl font-semibold mb-4">Blood Requests</h2>
+
+      <!-- Approve/Reject Table -->
+      <div class="bg-white p-4 rounded shadow mb-6">
+        <h4 class="font-semibold mb-2">Incoming Requests</h4>
+        <table class="w-full text-sm text-left">
+          <thead>
+            <tr class="bg-red-50 text-red-600">
+              <th class="p-2">Request ID</th>
+              <th class="p-2">Hospital</th>
+              <th class="p-2">Blood Type</th>
+              <th class="p-2">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- row data from database -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Active Responses Table with Scheduler -->
+      <div class="bg-white p-4 rounded shadow">
+        <!-- Active Responses Table with Scheduler and Approve Button -->
+<div class="bg-white p-4 rounded shadow">
+    <h4 class="font-semibold mb-2">Active Responses</h4>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm text-left">
+        <thead>
+          <tr class="bg-gray-50 text-gray-600">
+            <th class="p-2">Hospital</th>
+            <th class="p-2">Donor</th>
+            <th class="p-2">Blood Type</th>
+            <th class="p-2">Location</th>
+            <th class="p-2">Scheduled Time</th>
+            <th class="p-2">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b hover:bg-gray-50">
+            <td class="p-2">HealthCare Plus</td>
+            <td class="p-2">John Doe</td>
+            <td class="p-2">O+</td>
+            <td class="p-2">Lilongwe</td>
+            <td class="p-2">
+              <input type="datetime-local" class="border rounded p-1" />
+            </td>
+            <td class="p-2">
+              <button
+                class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                @click="approveSchedule(/* add your logic */)"
+              >
+                Approve
+              </button>
+            </td>
+          </tr>
+          <!-- You can loop more rows here using Alpine.js or JS fetch -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+    </section>
+
+    <!-- INVENTORY -->
+    <section x-show="tab === 'inventory'" x-transition>
+      <h2 class="text-2xl font-semibold mb-4">Inventory</h2>
+
+      <div class="grid gap-6">
+        <!-- Remote Blood Units -->
+        <div class="bg-white p-4 rounded shadow">
+          <h4 class="font-semibold mb-2">Remote Blood Units (Filtered by Hospital)</h4>
+          <canvas id="remoteInventoryChart"></canvas>
+        </div>
+
+        <!-- Blood Units -->
+        <div class="bg-white p-4 rounded shadow">
+          <h4 class="font-semibold mb-2">Local Blood Units</h4>
+          <canvas id="mbtsInventoryChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOGOUT -->
+    <section x-show="tab === 'logout'" x-transition>
+      <h2 class="text-2xl font-semibold mb-4 text-red-500">Confirm Logout</h2>
+      <button class="px-4 py-2 bg-red-500 text-white rounded">Logout</button>
+    </section>
+
+  </main>
+
+  <!-- Chart Init Scripts -->
+  <script>
+    // const ctx1 = document.getElementById('donorChart');
+    // new Chart(ctx1, {
+    //   type: 'doughnut',
+    //   data: {
+    //     labels: ['O-', 'O+', 'A+', 'B+', 'AB+'],
+    //     datasets: [{ data: [0, 0, 0, 0, 0], backgroundColor: ['#34244f', '#facc15', '#60a5fa', '#f87171', '#34d399'] }]
+    //   }
+    // });
+
+    // const ctx2 = document.getElementById('hospitalChart');
+    // new Chart(ctx2, {
+    //   type: 'bar',
+    //   data: {
+    //     labels: ['Hospital A', 'Hospital B'],
+    //     datasets: [{ label: 'Requests', data: [10, 15], backgroundColor: '#60a5fa' }]
+    //   }
+    // });
+
+    const ctx3 = document.getElementById('remoteInventoryChart');
+    new Chart(ctx3, {
+      type: 'line',
+      data: {
+        labels: ['Week 1', 'Week 2', 'Week 3'],
+        datasets: [{ label: 'Units', data: [20, 15, 30], borderColor: '#34d399', fill: false }]
+      }
+    });
+
+    const ctx4 = document.getElementById('mbtsInventoryChart');
+    new Chart(ctx4, {
+      type: 'bar',
+      data: {
+        labels: ['O+', 'A+', 'B+'],
+        datasets: [{ label: 'Units', data: [10, 5, 8], backgroundColor: '#f87171' }]
+      }
+    });
+  </script>
+</body>
+<script type="module">
+    
+  
+    // Fetch and populate dashboard stats
+    async function loadDashboardStats() {
+      const { data: pending, error: err1 } = await supabase
+        .from('requests')
+        .select('*')
+        .eq('status', 'pending');
+  
+      const { data: active, error: err2 } = await supabase
+        .from('requests')
+        .select('*')
+        .eq('status', 'active');
+  
+      const { data: scheduled, error: err3 } = await supabase
+        .from('requests')
+        .select('*')
+        .eq('status', 'scheduled');
+  
+      const { data: fulfilled, error: err4 } = await supabase
+        .from('requests')
+        .select('*')
+        .eq('status', 'fulfilled');
+  
+      document.querySelectorAll('p.text-2xl')[0].textContent = pending?.length ?? 0;
+      document.querySelectorAll('p.text-2xl')[1].textContent = active?.length ?? 0;
+      document.querySelectorAll('p.text-2xl')[2].textContent = scheduled?.length ?? 0;
+      document.querySelectorAll('p.text-2xl')[3].textContent = fulfilled?.length ?? 0;
+    }
+  
+    // 🏥 Populate Blood Requests Table
+    async function loadBloodRequests() {
+      const { data: requests, error } = await supabase
+        .from('blood_requests')
+        .select('id, blood_type, hospital_id')
+        .eq('status', 'pending');
+  
+      const tbody = document.querySelector("section[x-show='tab === \"requests\"'] tbody");
+      tbody.innerHTML = ""; // Clear default row
+  
+      requests.forEach(req => {
+        const row = document.createElement('tr');
+        row.className = 'border-b';
+        row.innerHTML = `
+          <td class="p-2">#${req.id}</td>
+          <td class="p-2">${req.hospital_name}</td>
+          <td class="p-2">${req.blood_type}</td>
+          <td class="p-2 space-x-2">
+            <button class="px-3 py-1 bg-green-500 text-white rounded">Approve</button>
+            <button class="px-3 py-1 bg-red-500 text-white rounded">Reject</button>
+          </td>`;
+        tbody.appendChild(row);
+      });
+    }
+  
+    // Example: Fetch data for Donor Chart
+    async function loadDonorChart() {
+      const { data: donors } = await supabase.from('users').select('blood_type');
+  
+      const countMap = {};
+      for (const donor of donors) {
+        const type = donor.blood_type;
+        countMap[type] = (countMap[type] || 0) + 1;
+      }
+  
+      const ctx = document.getElementById('donorChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(countMap),
+          datasets: [{
+            data: Object.values(countMap),
+            backgroundColor: ['#34244f', '#facc15', '#60a5fa', '#f87171', '#34d399']
+          }]
+        }
+      });
+    }
+
+    async function loadHospitalCard() {
+  const { data: hospitals } = await supabase.from('hospital_users').select();
+  const total = hospitals.length;
+
+  const container = document.getElementById('hospitalCard');
+  container.innerHTML = `
+    <div style="padding: 1.5rem; background: #facc15; color: #1e1b4b; border-radius: 1rem; font-size: 1.5rem; text-align: center;">
+      <strong>${total}</strong> Hospitals Registered
+    </div>
+  `;
+}
+
+  
+    // 🔁 Init
+    loadDashboardStats();
+    loadBloodRequests();
+    loadDonorChart();
+    loadHospitalCard();
+  </script>  
+</html>

@@ -1,145 +1,158 @@
-// Fetch hospital data (e.g., blood stock and active requests)
-async function fetchHospitalData() {
-  try {
-    const { data, error } = await supabase
-      .from('hospital_users')
-      .select('id, name, location')
-      .eq('email', localStorage.getItem('hospitalEmail'));
-    
-    if (error) throw error;
-    return data && data[0]; // Return the first result (hospital data)
-  } catch (err) {
-    console.error('Error fetching hospital data:', err);
-    return null;
-  }
+const router = new Navigo('/', { hash: true });
+const main = document.getElementById('main-content');
+
+async function getHospitalId() {
+  const email = localStorage.getItem('hospitalEmail');
+  const { data, error } = await supabase.from('hospital_users').select('id').eq('email', email).single();
+  return data?.id || null;
 }
 
-// Fetch blood stock overview from Supabase
-async function fetchBloodStock() {
-  try {
-    const { data, error } = await supabase
-      .from('blood_stock')
-      .select('*');
-    
-    if (error) throw error;
-    return data || [];
-  } catch (err) {
-    console.error('Error fetching blood stock:', err);
-    return [];
-  }
+async function fetchRequestsByStatus(status, hospitalId) {
+  const { data } = await supabase
+    .from('blood_requests')
+    .select('*')
+    .eq('hospital_id', hospitalId)
+    .eq('status', status);
+  return data || [];
 }
 
-// Fetch active requests from Supabase
-async function fetchActiveRequests() {
-  try {
-    const { data, error } = await supabase
-      .from('blood_requests')
-      .select('*')
-      .eq('status', 'active');
-    
-    if (error) throw error;
-    return data || [];
-  } catch (err) {
-    console.error('Error fetching active requests:', err);
-    return [];
-  }
+async function fetchBloodStock(hospitalId) {
+  const { data } = await supabase
+    .from('blood_stock')
+    .select('*')
+    .eq('hospital_id', hospitalId);
+  return data || [];
 }
 
-// Views
+async function updateBloodStock(hospitalId, bloodType, units) {
+  const { data, error } = await supabase
+    .from('blood_stock')
+    .upsert({ hospital_id: hospitalId, blood_type: bloodType, units }, { onConflict: ['hospital_id', 'blood_type'] });
+  if (error) console.error('Update error:', error);
+}
+
+async function submitBloodRequest(hospitalId, request) {
+  const { error } = await supabase.from('blood_requests').insert([{ ...request, hospital_id: hospitalId }]);
+  if (error) console.error('Insert error:', error);
+}
+
 const dashboardView = async () => {
-  const hospitalData = await fetchHospitalData();
-  const bloodStock = await fetchBloodStock();
-  const activeRequests = await fetchActiveRequests();
+  const hospitalId = await getHospitalId();
+  if (!hospitalId) return '<p class="text-red-600">Hospital ID not found.</p>';
+
+  const [pending, active, scheduled, fulfilled] = await Promise.all([
+    fetchRequestsByStatus('pending', hospitalId),
+    fetchRequestsByStatus('active', hospitalId),
+    fetchRequestsByStatus('scheduled', hospitalId),
+    fetchRequestsByStatus('fulfilled', hospitalId),
+  ]);
 
   return `
-    <h1 class="text-2xl font-semibold mb-6">Dashboard</h1>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-white p-4 rounded shadow">
-        <h2 class="font-bold mb-2">Recent Requests</h2>
-        <p class="text-sm text-gray-500">You have ${activeRequests.length} active requests</p>
-      </div>
-      <div class="bg-white p-4 rounded shadow">
-        <h2 class="font-bold mb-2">Responded Donors</h2>
-        <p class="text-sm text-gray-500">5 donors have responded today</p>
-      </div>
-    </div>
-    <div class="mt-6 bg-white p-4 rounded shadow">
-      <h2 class="font-bold mb-2">Blood Stock Overview</h2>
-      <div class="grid grid-cols-4 gap-4 mt-4">
-        ${bloodStock.map(stock => `
-          <div class="bg-red-50 p-4 rounded text-center shadow-sm">
-            <h3 class="font-bold text-red-600 text-xl">${stock.blood_type}</h3>
-            <p class="text-gray-600 text-sm">${stock.units} units</p>
-          </div>
-        `).join('')}
-      </div>
+    <h1 class="text-2xl font-bold mb-4">Hospital Dashboard</h1>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      ${['Pending', 'Active', 'Scheduled', 'Fulfilled'].map((label, i) => {
+        const count = [pending, active, scheduled, fulfilled][i].length;
+        return `
+          <div class="bg-white shadow rounded p-4">
+            <h2 class="text-xl font-semibold text-red-600">${label}</h2>
+            <p class="text-gray-700 mt-2">${count} request(s)</p>
+          </div>`;
+      }).join('')}
     </div>
   `;
 };
 
-const requestView = () => `
-  <h1 class="text-2xl font-semibold mb-6">Create Blood Request</h1>
-  <div class="bg-white p-6 rounded shadow space-y-4 max-w-xl">
-    <div>
-      <label class="block text-sm font-medium">Blood Type</label>
-      <select class="w-full mt-1 border p-2 rounded">
-        <option>A</option><option>B</option><option>AB</option><option>O</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-sm font-medium">Quantity (units)</label>
-      <input type="number" class="w-full mt-1 border p-2 rounded" />
-    </div>
-    <div>
-      <label class="block text-sm font-medium">Location</label>
-      <input type="text" class="w-full mt-1 border p-2 rounded" />
-      <p class="text-sm text-semibold text-blue-400">Use registered Location</p>
-    </div>
-    <div>
-      <label class="block text-sm font-medium">Urgency</label>
-      <select class="w-full mt-1 border p-2 rounded">
-        <option>Low</option><option>Medium</option><option>High</option>
-      </select>
-    </div>
-    <button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Submit Request</button>
-  </div>
-`;
+const requestFormView = async () => {
+  const hospitalId = await getHospitalId();
 
-const availabilityView = () => `
-  <h1 class="text-2xl font-semibold mb-6">Update Blood Stock</h1>
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    ${['A', 'B', 'AB', 'O'].map(type => `
-      <div class="bg-white p-4 rounded shadow flex items-center justify-between">
-        <span class="font-bold text-lg">${type}</span>
-        <input type="number" class="w-24 border p-1 rounded" placeholder="Units" />
-        <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Update</button>
+  return `
+    <h1 class="text-2xl font-semibold mb-6">Submit Blood Request</h1>
+    <form id="requestForm" class="bg-white p-6 rounded shadow space-y-4 max-w-xl">
+      <div>
+        <label class="block text-sm font-medium">Blood Type</label>
+        <select name="blood_type" class="w-full mt-1 border p-2 rounded">
+          <option>A</option><option>B</option><option>AB</option><option>O</option>
+        </select>
       </div>
-    `).join('')}
-  </div>
-`;
+      <div>
+        <label class="block text-sm font-medium">Quantity (units)</label>
+        <input name="units" type="number" required class="w-full mt-1 border p-2 rounded" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Urgency</label>
+        <select name="urgency" class="w-full mt-1 border p-2 rounded">
+          <option>Low</option><option>Medium</option><option>High</option>
+        </select>
+      </div>
+      <button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Submit</button>
+    </form>
 
-const renderWithAuth = async (viewFn) => {
+    <script>
+      document.getElementById("requestForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        await submitBloodRequest(${hospitalId}, {
+          blood_type: form.blood_type.value,
+          units: parseInt(form.units.value),
+          urgency: form.urgency.value,
+          status: "pending",
+          created_at: new Date().toISOString()
+        });
+        alert("Request submitted!");
+        form.reset();
+      }
+    </script>
+  `;
+};
+
+const inventoryView = async () => {
+  const hospitalId = await getHospitalId();
+  const stock = await fetchBloodStock(hospitalId);
+
+  return `
+    <h1 class="text-2xl font-semibold mb-6">Update Blood Inventory</h1>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      ${['A', 'B', 'AB', 'O'].map(type => {
+        const current = stock.find(s => s.blood_type === type)?.units || 0;
+        return `
+          <div class="bg-white p-4 shadow rounded flex items-center justify-between">
+            <span>${type}</span>
+            <input type="number" id="unit-${type}" class="border p-1 w-20 rounded" value="${current}">
+            <button onclick="updateStock('${type}')" class="bg-red-500 text-white px-2 py-1 rounded">Update</button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <script>
+      async function updateStock(type) {
+        const units = document.getElementById("unit-" + type).value;
+        await updateBloodStock(${hospitalId}, type, parseInt(units));
+        alert("Updated " + type + " units.");
+      }
+    </script>
+  `;
+};
+
+function render(html) {
+  main.innerHTML = html;
+}
+
+async function renderWithAuth(viewFn) {
   const email = localStorage.getItem("hospitalEmail");
   if (!email) {
     window.location.href = "../hospital/hospitalRegister.html";
     return;
   }
   render(await viewFn());
-};
+}
 
-// View Loader
-const render = (html) => {
-  main.innerHTML = html;
-};
-
-// Router Setup
 router.on({
-  '/': async () => renderWithAuth(dashboardView),
-  '/requests': () => renderWithAuth(requestView),
-  '/availability': () => renderWithAuth(availabilityView),
+  '/': () => renderWithAuth(dashboardView),
+  '/requests': () => renderWithAuth(requestFormView),
+  '/availability': () => renderWithAuth(inventoryView),
   '/logout': () => {
     localStorage.removeItem("hospitalEmail");
-    window.location.href = "../Index.html";
+    window.location.href = "../index.html";
   }
 }).resolve();
 
