@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ tab: 'dashboard' }" class="h-full bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RedBond Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/alpinejs" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://kit.fontawesome.com/244af82459.js" crossorigin="anonymous"></script>
+</head>
+
+<body class="h-full flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white border-r shadow-md p-4">
+    <h1 class="text-xl font-bold mb-6 text-red-600">RedBond <i class="fas fa-tint"></i></h1>
+    <ul class="space-y-2">
+      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'dashboard'"><i class="fas fa-home"></i> Primary Dashboard</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'requests'"><i class="fas fa-tint"></i> Blood Requests</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100" @click="tab = 'inventory'"><i class="fas fa-warehouse"></i> Inventory</button></li>
+      <li><button class="w-full text-left px-2 py-2 text-red-600 hover:bg-red-100 text-red-500" @click="tab = 'logout'"><i class="fas fa-power-off"></i> Logout</button></li>
+    </ul>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 p-6 overflow-y-auto space-y-6">
+
+    <!-- DASHBOARD -->
+    <section x-show="tab === 'dashboard'" x-transition>
+      <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+
+      <!-- Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-sm text-red-500">Pending Requests</h3>
+          <p class="text-2xl font-bold text-yellow-500">12</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-sm text-red-500">Active Requests</h3>
+          <p class="text-2xl font-bold text-blue-500">8</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-sm text-red-500">Scheduled Responds</h3>
+          <p class="text-2xl font-bold text-indigo-500">5</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-sm text-red-500">Fulfilled Requests</h3>
+          <p class="text-2xl font-bold text-green-500">26</p>
+        </div>
+      </div>
+
+      <!-- Charts Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div class="bg-white p-4 rounded shadow">
+          <h4 class="font-semibold mb-2">Donor Summary</h4>
+          <canvas id="donorChart"></canvas>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h4 class="font-semibold mb-2">Hospital Summary</h4>
+          <canvas id="hospitalChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- BLOOD REQUESTS -->
+    <section x-show="tab === 'requests'" x-transition>
+      <h2 class="text-2xl font-semibold mb-4">Blood Requests</h2>
+
+      <!-- Approve/Reject Table -->
+      <div class="bg-white p-4 rounded shadow mb-6">
+        <h4 class="font-semibold mb-2">Incoming Requests</h4>
+        <table class="w-full text-sm text-left">
+          <thead>
+            <tr class="bg-red-50 text-red-600">
+              <th class="p-2">Request ID</th>
+              <th class="p-2">Hospital</th>
+              <th class="p-2">Blood Type</th>
+              <th class="p-2">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Sample row -->
+            <tr class="border-b">
+              <td class="p-2">#R001</td>
+              <td class="p-2">City Hospital</td>
+              <td class="p-2">O+</td>
+              <td class="p-2 space-x-2">
+                <button class="px-3 py-1 bg-green-500 text-white rounded">Approve</button>
+                <button class="px-3 py-1 bg-red-500 text-white rounded">Reject</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Active Responses Table with Scheduler -->
+      <div class="bg-white p-4 rounded shadow">
+        <!-- Active Responses Table with Scheduler and Approve Button -->
+<div class="bg-white p-4 rounded shadow">
+    <h4 class="font-semibold mb-2">Active Responses</h4>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm text-left">
+        <thead>
+          <tr class="bg-gray-50 text-gray-600">
+            <th class="p-2">Hospital</th>
+            <th class="p-2">Donor</th>
+            <th class="p-2">Blood Type</th>
+            <th class="p-2">Location</th>
+            <th class="p-2">Scheduled Time</th>
+            <th class="p-2">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b hover:bg-gray-50">
+            <td class="p-2">HealthCare Plus</td>
+            <td class="p-2">John Doe</td>
+            <td class="p-2">O+</td>
+            <td class="p-2">Lilongwe</td>
+            <td class="p-2">
+              <input type="datetime-local" class="border rounded p-1" />
+            </td>
+            <td class="p-2">
+              <button
+                class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                @click="approveSchedule(/* add your logic */)"
+              >
+                Approve
+              </button>
+            </td>
+          </tr>
+          <!-- You can loop more rows here using Alpine.js or JS fetch -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+    </section>
+
+    <!-- INVENTORY -->
+    <section x-show="tab === 'inventory'" x-transition>
+      <h2 class="text-2xl font-semibold mb-4">Inventory</h2>
+
+      <div class="grid gap-6">
+        <!-- Remote Blood Units -->
+        <div class="bg-white p-4 rounded shadow">
+          <h4 class="font-semibold mb-2">Remote Blood Units (Filtered by Hospital)</h4>
+          <canvas id="remoteInventoryChart"></canvas>
+        </div>
+
+        <!-- Blood Units -->
+        <div class="bg-white p-4 rounded shadow">
+          <h4 class="font-semibold mb-2">Local Blood Units</h4>
+          <canvas id="mbtsInventoryChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOGOUT -->
+    <section x-show="tab === 'logout'" x-transition>
+      <h2 class="text-2xl font-semibold mb-4 text-red-500">Confirm Logout</h2>
+      <button class="px-4 py-2 bg-red-500 text-white rounded">Logout</button>
+    </section>
+
+  </main>
+
+  <!-- Chart Init Scripts -->
+  <script>
+    const ctx1 = document.getElementById('donorChart');
+    new Chart(ctx1, {
+      type: 'doughnut',
+      data: {
+        labels: ['O-', 'O+', 'A+', 'B+', 'AB+'],
+        datasets: [{ data: [13, 12, 19, 3, 5], backgroundColor: ['#34244f', '#facc15', '#60a5fa', '#f87171', '#34d399'] }]
+      }
+    });
+
+    const ctx2 = document.getElementById('hospitalChart');
+    new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: ['Hospital A', 'Hospital B'],
+        datasets: [{ label: 'Requests', data: [10, 15], backgroundColor: '#60a5fa' }]
+      }
+    });
+
+    const ctx3 = document.getElementById('remoteInventoryChart');
+    new Chart(ctx3, {
+      type: 'line',
+      data: {
+        labels: ['Week 1', 'Week 2', 'Week 3'],
+        datasets: [{ label: 'Units', data: [20, 15, 30], borderColor: '#34d399', fill: false }]
+      }
+    });
+
+    const ctx4 = document.getElementById('mbtsInventoryChart');
+    new Chart(ctx4, {
+      type: 'bar',
+      data: {
+        labels: ['O+', 'A+', 'B+'],
+        datasets: [{ label: 'Units', data: [10, 5, 8], backgroundColor: '#f87171' }]
+      }
+    });
+  </script>
+</body>
+</html>
