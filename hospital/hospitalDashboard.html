@@ -6,9 +6,10 @@
   <title>RedBond - Hospital Dashboard</title>
   <link rel="icon" href="/assets/icon.png" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="//unpkg.com/navigo"></script>
+  <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
   <script src="https://kit.fontawesome.com/244af82459.js" crossorigin="anonymous"></script>
   <script type="module" src="../config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -26,44 +27,303 @@
         <a href="#/availability" data-navigo class="nav-link text-gray-700 hover:text-red-600 flex items-center space-x-2">
           <i class="fas fa-sync-alt"></i><span>Update Availability</span>
         </a>
-        <a href="/logout" data-navigo class="nav-link text-gray-700 hover:text-red-600 flex items-center space-x-2">
-            <i class="fas fa-power-off"></i><span>Log-out</span>
+        <a href="#/logout" data-navigo class="nav-link text-gray-700 hover:text-red-600 flex items-center space-x-2">
+          <i class="fas fa-power-off"></i><span>Log-out</span>
         </a>
       </nav>
     </aside>
 
     <!-- Main Content -->
-    <main id="main-content" class="flex-1 p-6">
+    <main id="main" class="flex-1 p-6">
       <!-- JS will inject views here -->
     </main>
   </div>
 
-<!-- Supabase Script -->
-<script type="module">
+  <!-- Dashboard Logic -->
+  <script type="module">
+  const supabase = window.supabase;
+  const router = new Navigo('/', { hash: true });
+  const main = document.getElementById("main");
 
-  // Function to fetch hospital data
-  async function fetchHospitalData() {
-    try {
-      const { data, error } = await supabase
-        .from('hospital_users')
-        .select('*')
-        .eq('email', localStorage.getItem('hospitalEmail'));  // Assuming email is stored in localStorage after login
+  const render = (html) => main.innerHTML = html;
 
-      if (error) {
-        console.error('Error fetching data:', error);
-      } else {
-        console.log('Hospital data:', data);
-        // You can now inject this data into your dashboard
-      }
-    } catch (err) {
-      console.error('Error:', err);
-    }
+  const renderWithAuth = async (viewFn) => {
+    const email = localStorage.getItem("hospitalEmail");
+    if (!email) return (window.location.href = "../forms/hospitalRegister.html");
+    render(await viewFn());
+  };
+
+  async function getHospital() {
+    const email = localStorage.getItem("hospitalEmail");
+    const { data, error } = await supabase
+      .from("hospital_users")
+      .select("*")
+      .eq("email", email)
+      .single();
+    if (error) console.error("Fetch hospital error:", error);
+    return data;
   }
 
-  // Call the fetchHospitalData function when the page is loaded
-  window.onload = fetchHospitalData;
-</script>
+const dashboardView = async () => {
+  const hospital = await getHospital();
+  if (!hospital) return "<p>Error loading dashboard.</p>";
 
-<script src="../hospital/hospitalDashboard.html" defer></script>
+  const counts = {};
+  const statuses = ['pending', 'approved', 'fulfilled'];
+  for (const status of statuses) {
+    const { count, error } = await supabase
+      .from("blood_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("status", status)
+      .eq("hospital_id", hospital.id);
+    if (error) console.error(`Error fetching ${status} count:`, error);
+    counts[status] = count || 0;
+  }
+
+  // Fetch scheduled entries
+  const { data: schedules, error: scheduledError } = await supabase
+    .from("schedules")
+    .select("id, request_id, status")
+    .eq("hospital_id", hospital.id);
+
+  if (scheduledError) console.error("Error fetching schedules:", scheduledError);
+  counts["scheduled"] = schedules?.length || 0;
+
+  const scheduleMap = {};
+  (schedules || []).forEach(s => {
+    scheduleMap[s.request_id] = { id: s.id, status: s.status };
+  });
+
+  // Fetch all recent blood_requests activity
+  const { data: activityFeed } = await supabase
+    .from("blood_requests")
+    .select("*")
+    .eq("hospital_id", hospital.id)
+    .order("created_at", { ascending: false });
+
+  const activityList = activityFeed.map(req => {
+    const schedule = scheduleMap[req.id];
+   const showFulfill = schedule && schedule.status === "scheduled";
+
+
+    return `
+      <div class="border p-3 rounded-md bg-white shadow-sm">
+        <div class="flex justify-between">
+          <span class="font-semibold">${req.blood_type} (${req.units_needed} units)</span>
+          <span class="text-sm text-gray-500">${new Date(req.created_at).toLocaleString()}</span>
+        </div>
+        <p class="text-sm text-gray-600">Urgency: ${req.urgency} | Status: ${req.status}</p>
+       ${showFulfill
+  ? `<button class="bg-green-600 text-white px-3 py-1 rounded mt-2 hover:bg-green-700"
+      data-action="fulfill-schedule" data-id="${schedule.id}">
+      Fulfill
+    </button>`
+  : schedule && schedule.status === "fulfilled"
+    ? `<p class="text-green-600 text-sm mt-2 font-semibold">Fulfilled</p>`
+    : ""
+}
+
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <h1 class="text-2xl font-semibold mb-6">Hospital Dashboard</h1>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      ${['pending', 'approved', 'scheduled', 'fulfilled'].map(
+        (s) => `
+        <div class="bg-white p-4 rounded shadow">
+          <h2 class="font-bold text-lg capitalize">${s} Requests</h2>
+          <p>${counts[s]}</p>
+        </div>`
+      ).join("")}
+   <div class="bg-white rounded shadow p-4 overflow-y-auto"
+     style="max-height: calc(100vh - 260px); min-height: 200px; width: 1250px;">
+  <h2 class="text-xl font-semibold mb-4">Activity</h2>
+  <div id="activity-feed" class="space-y-3">
+    ${activityList}
+  </div>
+</div>
+
+</div>
+
+  `;
+};
+
+
+
+  const requestView = () => `
+    <h1 class="text-2xl font-semibold mb-6">Create Blood Request</h1>
+    <div class="bg-white p-6 rounded shadow space-y-4 max-w-xl">
+      <div>
+        <label class="block text-sm font-medium">Blood Type</label>
+        <select id="blood-type" class="w-full mt-1 border p-2 rounded">
+          <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+          <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Quantity (units)</label>
+        <input id="blood-quantity" type="number" class="w-full mt-1 border p-2 rounded" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Urgency</label>
+        <select id="urgency" class="w-full mt-1 border p-2 rounded">
+          <option>Low</option><option>Medium</option><option>High</option>
+        </select>
+      </div>
+      <button id="submit-request" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Submit Request</button>
+    </div>
+  `;
+
+  const availabilityView = async () => {
+    const types = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
+    const hospital = await getHospital();
+    const { data: inventory } = await supabase
+      .from("blood_inventory")
+      .select("blood_type, units_available")
+      .eq("hospital_id", hospital.id);
+
+    const inventoryMap = inventory.reduce((acc, item) => {
+      acc[item.blood_type] = item.units_available;
+      return acc;
+    }, {});
+
+    setTimeout(() => {
+      const ctx = document.getElementById('inventoryChart');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: types,
+          datasets: [{
+            label: 'Units Available',
+            data: types.map(t => inventoryMap[t] || 0),
+            backgroundColor: 'rgba(239, 68, 68, 0.7)'
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }, 100);
+
+    return `
+      <h1 class="text-2xl font-semibold mb-6">Update Blood Stock</h1>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        ${types.map(type => `
+          <div class="bg-white p-4 rounded shadow flex items-center gap-4 justify-between">
+            <span class="font-bold text-lg">${type}</span>
+            <input type="number" id="stock-${type}" class="w-24 border p-1 rounded" placeholder="Units" value="" />
+            <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" data-type="${type}">Update</button>
+          </div>
+        `).join('')}
+      </div>
+      <div class="mt-10 bg-white rounded shadow p-3">
+        <canvas id="inventoryChart" height="100"></canvas>
+      </div>
+    `;
+  };
+
+  // Routing
+  router.on({
+    '/': () => renderWithAuth(dashboardView),
+    '/requests': () => renderWithAuth(requestView),
+    '/availability': () => renderWithAuth(availabilityView),
+    '/logout': () => {
+      localStorage.removeItem("hospitalEmail");
+      window.location.href = "../index.html";
+    },
+  }).resolve();
+
+  window.addEventListener("DOMContentLoaded", async () => {
+    const currentHash = window.location.hash;
+    if(!currentHash || currentHash === "#/") {
+        router.navigate("/");
+    } else {
+        router.resolve();
+    }
+    router.resolve();
+    router.updatePageLinks();
+
+    document.body.addEventListener("click", async (e) => {
+      if (e.target.id === "submit-request") {
+        const type = document.getElementById("blood-type").value;
+        const qty = parseInt(document.getElementById("blood-quantity").value);
+        const urgency = document.getElementById("urgency").value;
+        const hospital = await getHospital();
+
+        if (!type || isNaN(qty) || qty <= 0 || !urgency || !hospital) {
+          return alert("All fields required with valid quantity.");
+        }
+
+        const { error } = await supabase.from("blood_requests").insert({
+          hospital_id: hospital.id,
+          blood_type: type,
+          units_needed: qty,
+          urgency,
+          status: "pending",
+        });
+
+        if (error) {
+          console.error("Supabase insert error:", error);
+          alert("Submission error: " + error.message);
+        } else {
+          alert("Request submitted!");
+          document.getElementById("blood-type").selectedIndex = 0;
+          document.getElementById("blood-quantity").value = "";
+          document.getElementById("urgency").selectedIndex = 0;
+        }
+      }
+
+      if (e.target.dataset?.type) {
+        const bloodType = e.target.dataset.type;
+        const input = document.getElementById(`stock-${bloodType}`);
+        const units = parseInt(input.value);
+        const hospital = await getHospital();
+        if (!hospital || isNaN(units)) return;
+
+        const { error: inventoryError } = await supabase
+          .from("blood_inventory")
+          .upsert({
+            hospital_id: hospital.id,
+            blood_type: bloodType,
+            units_available: units
+          }, { onConflict: ['hospital_id', 'blood_type'] });
+
+        if (inventoryError) {
+          console.error("Inventory update error:", inventoryError);
+          return alert("Error updating inventory.");
+        }
+
+        alert(`Updated ${bloodType} stock`);
+        input.value = "";
+      }
+    });
+
+    document.body.addEventListener("click", async (e) => {
+  if (e.target.dataset?.action === "fulfill-schedule" && e.target.dataset?.id) {
+    const scheduleId = e.target.dataset.id;
+    const { error } = await supabase
+      .from("schedules")
+      .update({ status: "fulfilled" })
+      .eq("id", scheduleId);
+
+    if (error) {
+      console.error("Error updating schedule status:", error);
+      alert("Failed to mark as fulfilled.");
+    } else {
+      alert("Schedule marked as fulfilled.");
+      renderWithAuth(dashboardView);
+    }
+  }
+});
+
+  });
+</script>
 </body>
 </html>
