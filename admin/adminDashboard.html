@@ -80,7 +80,7 @@
               <th class="p-2">Action</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="bloodRequestsTbody">
             <!-- row data from database -->
           </tbody>
         </table>
@@ -89,41 +89,42 @@
       <!-- Active Responses Table with Scheduler -->
       <div class="bg-white p-4 rounded shadow">
         <!-- Active Responses Table with Scheduler and Approve Button -->
-<div class="bg-white p-4 rounded shadow">
-    <h4 class="font-semibold mb-2">Active Responses</h4>
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm text-left">
-        <thead>
-          <tr class="bg-gray-50 text-gray-600">
-            <th class="p-2">Hospital</th>
-            <th class="p-2">Donor</th>
-            <th class="p-2">Blood Type</th>
-            <th class="p-2">Location</th>
-            <th class="p-2">Scheduled Time</th>
-            <th class="p-2">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="border-b hover:bg-gray-50">
-            <td class="p-2">HealthCare Plus</td>
-            <td class="p-2">John Doe</td>
-            <td class="p-2">O+</td>
-            <td class="p-2">Lilongwe</td>
-            <td class="p-2">
-              <input type="datetime-local" class="border rounded p-1" />
-            </td>
-            <td class="p-2">
-              <button
-                class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                @click="approveSchedule(/* add your logic */)"
-              >
-                Approve
-              </button>
-            </td>
-          </tr>
-          <!-- You can loop more rows here using Alpine.js or JS fetch -->
-        </tbody>
-      </table>
+    <div class="bg-white p-4 rounded shadow">
+        <h4 class="font-semibold mb-2">Active Responses</h4>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead>
+            <tr class="bg-gray-50 text-gray-600">
+                <th class="p-2">ID</th>
+                <th class="p-2">Hospital</th>
+                <th class="p-2">Blood Type</th>
+                <th class="p-2">Donor</th>
+                <th class="p-2">Location</th>
+                <th class="p-2">Scheduled Time</th>
+                <th class="p-2">Action</th>
+            </tr>
+            </thead>
+            <tbody id="approvedRequestsTbody">
+            <!-- <tr class="border-b hover:bg-gray-50">
+                <td class="p-2">HealthCare Plus</td>
+                <td class="p-2">John Doe</td>
+                <td class="p-2">O+</td>
+                <td class="p-2">Lilongwe</td>
+                <td class="p-2">
+                <input type="datetime-local" class="border rounded p-1" />
+                </td>
+                <td class="p-2">
+                <button
+                    class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                    @click="approveSchedule(/* add your logic */)"
+                >
+                    Approve
+                </button>
+                </td>
+            </tr> -->
+            <!-- You can loop more rows here using Alpine.js or JS fetch -->
+            </tbody>
+        </table>
     </div>
   </div>
   
@@ -158,23 +159,6 @@
 
   <!-- Chart Init Scripts -->
   <script>
-    // const ctx1 = document.getElementById('donorChart');
-    // new Chart(ctx1, {
-    //   type: 'doughnut',
-    //   data: {
-    //     labels: ['O-', 'O+', 'A+', 'B+', 'AB+'],
-    //     datasets: [{ data: [0, 0, 0, 0, 0], backgroundColor: ['#34244f', '#facc15', '#60a5fa', '#f87171', '#34d399'] }]
-    //   }
-    // });
-
-    // const ctx2 = document.getElementById('hospitalChart');
-    // new Chart(ctx2, {
-    //   type: 'bar',
-    //   data: {
-    //     labels: ['Hospital A', 'Hospital B'],
-    //     datasets: [{ label: 'Requests', data: [10, 15], backgroundColor: '#60a5fa' }]
-    //   }
-    // });
 
     const ctx3 = document.getElementById('remoteInventoryChart');
     new Chart(ctx3, {
@@ -201,22 +185,22 @@
     // Fetch and populate dashboard stats
     async function loadDashboardStats() {
       const { data: pending, error: err1 } = await supabase
-        .from('requests')
+        .from('blood_requests')
         .select('*')
         .eq('status', 'pending');
   
       const { data: active, error: err2 } = await supabase
-        .from('requests')
+        .from('blood_requests')
         .select('*')
         .eq('status', 'active');
   
       const { data: scheduled, error: err3 } = await supabase
-        .from('requests')
+        .from('blood_requests')
         .select('*')
         .eq('status', 'scheduled');
   
       const { data: fulfilled, error: err4 } = await supabase
-        .from('requests')
+        .from('blood_requests')
         .select('*')
         .eq('status', 'fulfilled');
   
@@ -225,31 +209,124 @@
       document.querySelectorAll('p.text-2xl')[2].textContent = scheduled?.length ?? 0;
       document.querySelectorAll('p.text-2xl')[3].textContent = fulfilled?.length ?? 0;
     }
+
+
+// Fix this scope
+// async function loadPendingResponses() {
+//   const { data: responses, error } = await supabase
+//     .from('responses')
+//     .select('id, name, blood_type, hospital_id, donor_id, location') // Adjust if needed
+//     .eq('status', 'pending');
+
+//   if (error) {
+//     console.error("❌ Error fetching pending responses:", error);
+//     return;
+//   }
+
+//   const tbody = document.getElementById("approvedRequestsTbody");
+//   if (!tbody) {
+//     console.warn("⚠️ Table body with ID 'approvedRequestsTbody' not found.");
+//     return;
+//   }
+
+//   tbody.innerHTML = "";
+
+//   responses.forEach(res => {
+//     const row = document.createElement("tr");
+//     row.className = "border-b hover:bg-gray-50";
+
+//     row.innerHTML = `
+//       <td class="p-2">${res.hospital_id || "Unknown Hospital"}</td>
+//       <td class="p-2">${res.name || "No Name"}</td>
+//       <td class="p-2">${res.blood_type}</td>
+//       <td class="p-2">${res.donor_id || "N/A"}</td>
+//       <td class="p-2">${res.location || "Unknown"}</td>
+//       <td class="p-2">
+//         <input type="datetime-local" class="border rounded p-1" />
+//       </td>
+//       <td class="p-2">
+//         <button
+//           class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+//           onclick="approveSchedule('${res.id}', '${res.hospital_id}', this)"
+//         >
+//           Approve
+//         </button>
+//       </td>
+//     `;
+//     tbody.appendChild(row);
+//   });
+// }
+
+
   
-    // 🏥 Populate Blood Requests Table
+    // Populate Blood Requests Table
     async function loadBloodRequests() {
-      const { data: requests, error } = await supabase
+    const { data: requests, error } = await supabase
         .from('blood_requests')
-        .select('id, blood_type, hospital_id')
+        .select('id, blood_type, name')
         .eq('status', 'pending');
-  
-      const tbody = document.querySelector("section[x-show='tab === \"requests\"'] tbody");
-      tbody.innerHTML = ""; // Clear default row
-  
-      requests.forEach(req => {
+
+    const tbody = document.getElementById("bloodRequestsTbody");
+
+    if (!tbody) {
+        console.warn("Could not find tbody for blood requests.");
+        return;
+    }
+
+    tbody.innerHTML = "";
+
+    requests.forEach(req => {
         const row = document.createElement('tr');
         row.className = 'border-b';
+
         row.innerHTML = `
-          <td class="p-2">#${req.id}</td>
-          <td class="p-2">${req.hospital_name}</td>
-          <td class="p-2">${req.blood_type}</td>
-          <td class="p-2 space-x-2">
-            <button class="px-3 py-1 bg-green-500 text-white rounded">Approve</button>
-            <button class="px-3 py-1 bg-red-500 text-white rounded">Reject</button>
-          </td>`;
+            <td class="p-2">#${req.id}</td>
+            <td class="p-2">${req.name}</td>
+            <td class="p-2">${req.blood_type}</td>
+            <td class="p-2 space-x-2">
+                <button class="approve-btn px-3 py-1 bg-green-500 text-white rounded">Approve</button>
+                <button class="reject-btn px-3 py-1 bg-red-500 text-white rounded">Reject</button>
+            </td>
+        `;
+
+        // Append row first so querySelector works
         tbody.appendChild(row);
-      });
-    }
+
+        // Add event listeners
+        const approveBtn = row.querySelector('.approve-btn');
+        const rejectBtn = row.querySelector('.reject-btn');
+
+        approveBtn.addEventListener('click', async () => {
+            const { error } = await supabase
+                .from('blood_requests')
+                .update({ status: 'approved' })
+                .eq('id', req.id);
+
+            if (error) {
+                alert("Error approving request: " + error.message);
+            } else {
+                alert("Request approved.");
+                loadBloodRequests(); // Refresh the list
+            }
+        });
+
+        rejectBtn.addEventListener('click', async () => {
+            const { error } = await supabase
+                .from('blood_requests')
+                .update({ status: 'rejected' })
+                .eq('id', req.id);
+
+            if (error) {
+                alert("Error rejecting request: " + error.message);
+            } else {
+                alert("Request rejected.");
+                loadBloodRequests(); // Refresh the list
+            }
+        });
+    });
+}
+
+
   
     // Example: Fetch data for Donor Chart
     async function loadDonorChart() {
@@ -292,5 +369,6 @@
     loadBloodRequests();
     loadDonorChart();
     loadHospitalCard();
+    loadPendingResponses();
   </script>  
 </html>
