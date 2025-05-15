@@ -209,17 +209,17 @@
 async function loadPendingResponses() {
   const { data: responses, error } = await supabase
     .from('responses')
-    .select('id, request_id, donor_id') // Adjust if needed
+    .select('id, request_id, donor_id')
     .eq('status', 'pending');
 
   if (error) {
-    console.error(" Error fetching pending responses:", error);
+    console.error("Error fetching pending responses:", error);
     return;
   }
 
   const tbody = document.getElementById("approvedRequestsTbody");
   if (!tbody) {
-    console.warn(" Table body with ID 'approvedRequestsTbody' not found.");
+    console.warn("Table body with ID 'approvedRequestsTbody' not found.");
     return;
   }
 
@@ -228,24 +228,61 @@ async function loadPendingResponses() {
   responses.forEach(res => {
     const row = document.createElement("tr");
     row.className = "border-b hover:bg-gray-50";
+    const inputId = `datetime-${res.id}`;
 
     row.innerHTML = `
-      <td class="p-2">${res.id || "Unknown Hospital"}</td>
-      <td class="p-2">${res.request_id || "No Name"}</td>
-      <td class="p-2">${res.donor_id}</td>
+      <td class="p-2">${res.id || "Unknown ID"}</td>
+      <td class="p-2">${res.request_id || "No Request"}</td>
+      <td class="p-2">${res.donor_id || "No Donor"}</td>
       <td class="p-2">
-        <input type="datetime-local" class="border rounded p-1" />
+        <input type="datetime-local" id="${inputId}" class="border rounded p-1" />
       </td>
-      <td class="p-2">
-        <button
-          class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-          onclick="approveSchedule('${res.id}', '${res.request_id}', this)"
-        >
-          Approve
-        </button>
+      <td class="p-2" id="status-${res.id}">
+        <span class="text-yellow-600">Pending (Auto in 10s)</span>
       </td>
     `;
+
     tbody.appendChild(row);
+
+    // Start 30-second timer for auto-approval
+    setTimeout(async () => {
+  const dateInput = document.getElementById(inputId);
+  const scheduledAt = dateInput?.value || new Date().toISOString(); // fallback to now
+
+  // First update the response status to 'approved' (not 'scheduled')
+  const { error: responseError } = await supabase
+    .from('responses')
+    .update({
+      status: 'approved'
+    })
+    .eq('id', res.id);
+
+  if (responseError) {
+    console.error(`Failed to update response ${res.id}:`, responseError);
+    const statusCell = document.getElementById(`status-${res.id}`);
+    if (statusCell) statusCell.innerHTML = `<span class="text-red-600">Failed</span>`;
+    return;
+  }
+
+  // Then insert into the schedules table
+  const { error: scheduleError } = await supabase
+    .from('schedules')
+    .insert({
+      response_id: res.id,
+      scheduled_date: scheduledAt,
+      hospital_id: YOUR_HOSPITAL_ID, // Replace this with actual logic to fetch or store hospital_id
+      location: 'Main Clinic' // or use a dynamic value if available
+    });
+
+  const statusCell = document.getElementById(`status-${res.id}`);
+  if (scheduleError) {
+    console.error(`Failed to create schedule for response ${res.id}:`, scheduleError);
+    if (statusCell) statusCell.innerHTML = `<span class="text-yellow-600">Approved, but not Scheduled</span>`;
+  } else {
+    if (statusCell) statusCell.innerHTML = `<span class="text-green-600">Auto-Scheduled</span>`;
+  }
+}, 10000); // 30 seconds
+ // 30 seconds
   });
 }
 
