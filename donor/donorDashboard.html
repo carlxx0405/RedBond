@@ -9,10 +9,25 @@
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Alpine.js CDN -->
-  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
   <!-- Navigo Router CDN -->
   <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet Search Plugin -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+  <style>
+    #map {
+      height: 600px;
+      width: 100%;
+    }
+  </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
   <div id="app" class="max-w-3xl mx-auto pt-6"></div>
@@ -22,14 +37,61 @@
       return {
         username: localStorage.getItem("donorName") || "Donor",
         approvedRequests: [
-          { id: 1, hospitalName: "Hope Clinic", location: "Lagos", urgency: "High" },
-          { id: 2, hospitalName: "LifeCare Hospital", location: "Abuja", urgency: "Medium" },
+          { id: 1, hospitalName: "Hope Clinic", location: "Lilongwe", urgency: "High" },
+          { id: 2, hospitalName: "LifeCare Hospital", location: "Blantyre", urgency: "Medium" },
         ],
         pendingResponses: [
           { id: 101, hospitalName: "Saint Mary's", date: "2025-05-01" }
         ],
-        init() {
-          // future logic (e.g. Firebase fetch)
+        map: null,
+        init() {},
+        initMap() {
+          if (this.map) return;
+
+          const fallbackCoords = [-13.2543, 34.3015];
+          const zoomLevel = 7;
+
+          this.map = L.map('map').setView(fallbackCoords, zoomLevel);
+
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors',
+          }).addTo(this.map);
+
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                this.map.setView([lat, lng], 13);
+                L.marker([lat, lng])
+                  .addTo(this.map)
+                  .bindPopup("You are here")
+                  .openPopup();
+              },
+              () => {
+                console.warn("Geolocation permission denied or failed.");
+              }
+            );
+          }
+
+          const locations = {
+            "Hope Clinic": [-13.9626, 33.7741],
+            "LifeCare Hospital": [-15.7861, 35.0085],
+            "Saint Mary's": [-10.2667, 34.2333]
+          };
+
+          this.approvedRequests.forEach(req => {
+            const coords = locations[req.hospitalName];
+            if (coords) {
+              L.marker(coords)
+                .addTo(this.map)
+                .bindPopup(`<strong>${req.hospitalName}</strong><br/>Location: ${req.location}<br/>Urgency: ${req.urgency}`);
+            }
+          });
+
+          // Add geocoder control
+          L.Control.geocoder().addTo(this.map);
         },
         goToMap() {
           router.navigate("/map");
@@ -42,24 +104,18 @@
 
     const donorDashboardView = () => `
       <div x-data="donorDashboard()" x-init="init()" class="p-4 space-y-6">
-
         <h1 class="text-xl sm:text-2xl font-semibold">Hi, <span x-text="username"></span></h1>
-
         <div class="bg-white p-4 rounded shadow-md">
           <h2 class="text-lg font-medium mb-2">What do you want to do?</h2>
-          <button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
+          <button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition" @click="goToMap()">
             Donate Blood
           </button>
         </div>
-
         <div>
           <div class="flex justify-between items-center mb-2">
             <h2 class="text-lg font-semibold">Approved Hospital Requests</h2>
-            <button @click="goToMap()" class="text-blue-600 hover:underline text-sm">
-              See All on Map
-            </button>
+            <button @click="goToMap()" class="text-blue-600 hover:underline text-sm">See All on Map</button>
           </div>
-
           <div class="space-y-4">
             <template x-for="request in approvedRequests" :key="request.id">
               <div class="bg-white p-4 rounded shadow-sm border">
@@ -70,7 +126,6 @@
             </template>
           </div>
         </div>
-
         <div>
           <h2 class="text-lg font-semibold mb-2">Your Pending Responses</h2>
           <template x-if="pendingResponses.length > 0">
@@ -88,22 +143,16 @@
             <p class="text-sm text-gray-500 italic">No pending responses at the moment.</p>
           </template>
         </div>
-
       </div>
     `;
 
     const donorMapView = () => `
-      <div x-data="donorDashboard()" x-init="init()" class="p-4 space-y-4">
+      <div x-data="donorDashboard()" x-init="initMap()" class="p-4 space-y-4">
         <div class="flex justify-between items-center">
           <h2 class="text-xl font-semibold">Hospital Request Locations</h2>
-          <button @click="goToDashboard()" class="text-blue-600 hover:underline text-sm">
-            Hide Map
-          </button>
+          <button @click="goToDashboard()" class="text-blue-600 hover:underline text-sm">Hide Map</button>
         </div>
-
-        <div class="bg-gray-100 h-60 rounded mt-2 flex items-center justify-center">
-          <p class="text-gray-500">[Map View Placeholder]</p>
-        </div>
+        <div id="map" class="rounded mt-2 shadow"></div>
       </div>
     `;
 
@@ -111,9 +160,14 @@
     const app = document.getElementById("app");
 
     const render = (html) => {
-      app.innerHTML = html;
-      Alpine.initTree(app);
-    };
+  app.innerHTML = html;
+  // Wait for DOM to fully update before initializing Alpine
+  requestAnimationFrame(() => {
+    Alpine.destroyTree(app); // Optional, if Alpine fails to clean up
+    Alpine.initTree(app);
+  });
+};
+
 
     router
       .on({
@@ -122,16 +176,15 @@
       })
       .resolve();
 
-      window.addEventListener("DOMContentLoaded", () => {
-        const currentHash = window.location.hash;
-        if (!currentHash || currentHash === "#/") {
-            router.navigate("/"); // manually load default route
-        } else {
-            router.resolve();
-        }
-        router.updatePageLinks();
-        });
-
+    window.addEventListener("DOMContentLoaded", () => {
+      const currentHash = window.location.hash;
+      if (!currentHash || currentHash === "#/") {
+        router.navigate("/");
+      } else {
+        router.resolve();
+      }
+      router.updatePageLinks();
+    });
   </script>
 </body>
 </html>
