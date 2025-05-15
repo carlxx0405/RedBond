@@ -40,89 +40,68 @@
     function donorDashboard() {
       return {
         username: "",
-        approvedRequests: [
-          { id: 1, hospitalName: "Hope Clinic", location: "Lilongwe", urgency: "High" },
-          { id: 2, hospitalName: "LifeCare Hospital", location: "Blantyre", urgency: "Medium" },
-        ],
-        pendingResponses: [
-          { id: 101, hospitalName: "Saint Mary's", date: "2025-05-01" }
-        ],
+        approvedRequests: [],
+        pendingResponses: [], // You can fetch this similarly later
         map: null,
-        init: async function () {
-
-          const {
-            data: { user }
-          } = await supabase.auth.getUser();
-
+  
+        async init() {
+          const { data: { user } } = await supabase.auth.getUser();
+  
           if (user?.email) {
-            const { data, error } = await supabase
+            const { data } = await supabase
               .from("users")
               .select("full_name")
               .eq("email", user.email)
               .single();
-
-            if (data?.full_name) {
-              this.username = data.full_name;
-            }
+            if (data?.full_name) this.username = data.full_name;
+          }
+  
+          const { data: approved, error } = await supabase
+            .from("blood_requests")
+            .select("id, name, Location, urgency")
+            .eq("status", "approved");
+  
+          if (!error) {
+            this.approvedRequests = approved.map(req => ({
+              id: req.id,
+              hospitalName: req.name,
+              location: req.location,
+              urgency: req.urgency
+            }));
+          } else {
+            console.error("Failed to fetch approved requests:", error);
           }
         },
-        initMap() {
-          if (this.map) return;
-
-          const fallbackCoords = [-13.2543, 34.3015];
-          const zoomLevel = 7;
-
-          this.map = L.map('map').setView(fallbackCoords, zoomLevel);
-
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors',
+  
+        async initMap() {
+          await this.init(); // fetch data first
+          this.map = L.map("map").fitWorld(); // Lagos coordinates
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "© OpenStreetMap contributors"
           }).addTo(this.map);
-
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                this.map.setView([lat, lng], 13);
+  
+          this.approvedRequests.forEach(req => {
+            if (req.location) {
+              const [lat, lng] = req.location.split(',').map(Number);
+              if (!isNaN(lat) && !isNaN(lng)) {
                 L.marker([lat, lng])
                   .addTo(this.map)
-                  .bindPopup("You are here")
-                  .openPopup();
-              },
-              () => {
-                console.warn("Geolocation permission denied or failed.");
+                  .bindPopup(`<strong>${req.hospitalName}</strong><br/>Urgency: ${req.urgency}`);
               }
-            );
-          }
-
-          const locations = {
-            "Hope Clinic": [-13.9626, 33.7741],
-            "LifeCare Hospital": [-15.7861, 35.0085],
-            "Saint Mary's": [-10.2667, 34.2333]
-          };
-
-          this.approvedRequests.forEach(req => {
-            const coords = locations[req.hospitalName];
-            if (coords) {
-              L.marker(coords)
-                .addTo(this.map)
-                .bindPopup(`<strong>${req.hospitalName}</strong><br/>Location: ${req.location}<br/>Urgency: ${req.urgency}`);
             }
           });
-
-          // Add geocoder control
-          L.Control.geocoder().addTo(this.map);
         },
+  
         goToMap() {
           router.navigate("/map");
         },
+  
         goToDashboard() {
           router.navigate("/");
         }
       };
     }
-
+  
     const donorDashboardView = () => `
       <div x-data="donorDashboard()" x-init="init()" class="p-4 space-y-6">
         <h1 class="text-xl sm:text-2xl font-semibold">Hi, <span x-text="username"></span></h1>
@@ -137,7 +116,7 @@
             <h2 class="text-lg font-semibold">Approved Hospital Requests</h2>
             <button @click="goToMap()" class="text-blue-600 hover:underline text-sm">See All on Map</button>
           </div>
-          <div class="space-y-4">
+          <div class="space-y-4 ">
             <template x-for="request in approvedRequests" :key="request.id">
               <div class="bg-white p-4 rounded shadow-sm border">
                 <h3 class="font-bold text-red-600" x-text="request.hospitalName"></h3>
@@ -166,7 +145,7 @@
         </div>
       </div>
     `;
-
+  
     const donorMapView = () => `
       <div x-data="donorDashboard()" x-init="initMap()" class="p-4 space-y-4">
         <div class="flex justify-between items-center">
@@ -176,25 +155,30 @@
         <div id="map" class="rounded mt-2 shadow"></div>
       </div>
     `;
-
+  
     const router = new Navigo("/", { hash: true });
     const app = document.getElementById("app");
-
+  
     const render = (html) => {
       app.innerHTML = html;
       requestAnimationFrame(() => {
-        Alpine.destroyTree(app);
-        Alpine.initTree(app);
+        if (window.Alpine) {
+          Alpine.destroyTree(app);
+          Alpine.initTree(app);
+        } else {
+          console.warn("Alpine is not yet available.");
+        }
       });
     };
 
+  
     router
       .on({
         "/": () => render(donorDashboardView()),
         "/map": () => render(donorMapView())
       })
       .resolve();
-
+  
     window.addEventListener("DOMContentLoaded", () => {
       const currentHash = window.location.hash;
       if (!currentHash || currentHash === "#/") {
@@ -204,6 +188,6 @@
       }
       router.updatePageLinks();
     });
-  </script>
+  </script>  
 </body>
 </html>
