@@ -59,16 +59,16 @@
 
               const { data: requests } = await window.supabase
                 .from("blood_requests")
-                .select("id, hospital_id, hospital_name, urgency, latitude, longitude, status")
+                .select("id, hospital_id, units_needed, blood_type, hospital_name, urgency, latitude, longitude, status")
                 .eq("status", "approved");
 
               this.approvedRequests = requests || [];
 
               const { data: pending } = await window.supabase
                 .from("responses")
-                .select("id, donor_name, responded_at, status")
+                .select("id, donor_name, donor_id, responded_at, status")
                 .eq("status", "pending")
-                .eq("donor_name", this.username); // Compare by full name
+                .eq("donor_name", this.username);
 
               this.pendingResponses = pending || [];
 
@@ -78,7 +78,10 @@
         },
 
         initMap() {
-          if (this.map) return;
+          if (this.map) {
+            this.map.remove();
+            this.map = null;
+          }
 
           const defaultCoords = [-13.2543, 34.3015];
           const zoomLevel = 7;
@@ -106,17 +109,66 @@
 
           this.approvedRequests.forEach(req => {
             if (req.latitude && req.longitude) {
-              L.marker([req.latitude, req.longitude])
-                .addTo(this.map)
-                .bindPopup(`
+              const popupContent = `
+                <div class="p-2 max-w-xs">
                   <strong>Hospital:</strong> ${req.hospital_name || 'N/A'}<br/>
                   <strong>Urgency:</strong> ${req.urgency || 'N/A'}<br/>
-                  <strong>Lat:</strong> ${req.latitude}, <strong>Lng:</strong> ${req.longitude}
-                `);
+                  <strong>Blood type needed:</strong> ${req.blood_type || 'N/A'}<br/>
+                  <strong>Units Needed:</strong> ${req.units_needed || 'N/A'}<br/><br/>
+                  <form id="donation-form-${req.id}" onsubmit="event.preventDefault(); window.submitDonation('${req.id}', '${req.blood_type}', ${req.units_needed});">
+                    <label class="block text-sm font-medium mb-1" for="donor-name-${req.id}">Your Name:</label>
+                    <input id="donor-name-${req.id}" name="donor_name" type="text" class="w-full border rounded px-2 py-1 mb-2" required value="${this.username}" />
+                    <button type="submit" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition w-full">Donate All</button>
+                  </form>
+                  <div id="donation-message-${req.id}" class="mt-2 text-sm"></div>
+                </div>
+              `;
+
+              L.marker([req.latitude, req.longitude])
+                .addTo(this.map)
+                .bindPopup(popupContent);
             }
           });
 
           L.Control.geocoder().addTo(this.map);
+        },
+
+        async submitDonation(requestId, bloodType, unitsNeeded) {
+          const form = document.getElementById(`donation-form-${requestId}`);
+          const messageDiv = document.getElementById(`donation-message-${requestId}`);
+
+          if (!form) return;
+
+          const donor_name = form.querySelector(`[name="donor_name"]`).value.trim();
+
+          if (!donor_name) {
+            messageDiv.textContent = `Please provide your name.`;
+            messageDiv.style.color = "red";
+            return;
+          }
+
+          try {
+            const { error } = await window.supabase
+              .from('responses')
+              .insert([{
+                donor_name,
+                donor_id: donorId,
+                request_id: requestId,
+                status: 'pending',
+                responded_at: new Date().toISOString(),
+              }]);
+
+            if (error) throw error;
+
+            messageDiv.textContent = "Thank you for your donation! Your response has been recorded.";
+            messageDiv.style.color = "green";
+            form.reset();
+
+          } catch (error) {
+            console.error(error);
+            messageDiv.textContent = "Error submitting donation. Please try again.";
+            messageDiv.style.color = "red";
+          }
         },
 
         goToMap() {
@@ -128,6 +180,13 @@
         }
       };
     }
+
+    window.submitDonation = async function(requestId, bloodType, unitsNeeded) {
+      const component = document.querySelector('[x-data]');
+      if (component && component.__x) {
+        await component.__x.$data.submitDonation(requestId, bloodType, unitsNeeded);
+      }
+    };
 
     const donorDashboardView = () => `
       <div x-data="donorDashboard()" x-init="init()" class="p-4 space-y-6">
@@ -149,9 +208,10 @@
             <template x-for="request in approvedRequests" :key="request.id">
               <div class="bg-white p-4 rounded shadow-sm border">
                 <h3 class="font-bold text-red-600" x-text="request.hospital_name"></h3>
-                <p class="text-sm" x-text="'Request ID: ' + request.id"></p>
                 <p class="text-sm" x-text="'Latitude: ' + request.latitude"></p>
                 <p class="text-sm" x-text="'Longitude: ' + request.longitude"></p>
+                <p class="text-sm" x-text="'Blood type: ' + request.blood_type"></p>
+                <p class="text-sm" x-text="'Units Needed: ' + request.units_needed"></p>
                 <p class="text-sm" x-text="'Urgency: ' + request.urgency"></p>
               </div>
             </template>
@@ -190,32 +250,22 @@
 
     const router = new Navigo("/", { hash: true });
     const app = document.getElementById("app");
-    const supabase = window.supabase;
 
     const render = (html) => {
       app.innerHTML = html;
       requestAnimationFrame(() => {
-        Alpine.destroyTree(app);
-        Alpine.initTree(app);
+        Alpine.flushAndStopDeferringMutations();
       });
     };
 
     router
-      .on({
-        "/": () => render(donorDashboardView()),
-        "/map": () => render(donorMapView())
+      .on("/", () => {
+        render(donorDashboardView());
+      })
+      .on("/map", () => {
+        render(donorMapView());
       })
       .resolve();
-
-    window.addEventListener("DOMContentLoaded", () => {
-      const currentHash = window.location.hash;
-      if (!currentHash || currentHash === "#/") {
-        router.navigate("/");
-      } else {
-        router.resolve();
-      }
-      router.updatePageLinks();
-    });
   </script>
 </body>
 </html>
