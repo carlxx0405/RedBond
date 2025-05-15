@@ -77,30 +77,34 @@
         password: '',
         bloodGroup: '',
         location: '',
+        latitude: null,
+        longitude: null,
         isLoading: false,
         message: '',
         isSuccess: false,
         ageError: false,
         locationError: false,
-        
 
         detectLocation() {
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                this.location = `Lat: ${pos.coords.latitude}, Long: ${pos.coords.longitude}`;
-                this.locationError = false;
-              },
-              () => {
-                this.locationError = true;
-                this.message = "Location access denied.";
-              }
-            );
-          } else {
-            this.locationError = true;
-            this.message = "Geolocation not supported.";
-          }
-        },
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        this.latitude = pos.coords.latitude;
+        this.longitude = pos.coords.longitude;
+        this.location = `Lat: ${this.latitude.toFixed(5)}, Long: ${this.longitude.toFixed(5)}`; // for display only
+        this.locationError = false;
+      },
+      () => {
+        this.locationError = true;
+        this.message = "Location access denied.";
+      }
+    );
+  } else {
+    this.locationError = true;
+    this.message = "Geolocation not supported.";
+  }
+},
+
 
         validateAge() {
           this.ageError = this.age < 16 || this.age > 65;
@@ -126,8 +130,8 @@
               .insert([{
                 id: authData.user.id,
                 email: this.email,
-                age: this.age,
                 password: this.password,
+                age: this.age,
                 full_name: `${this.firstName} ${this.surname}`,
                 blood_type: this.bloodGroup,
                 location: this.location,
@@ -163,7 +167,6 @@
 
             if (error) throw error;
 
-            // Fetch the user's role from the 'users' table
             const { data: profile, error: profileError } = await supabase
               .from('users')
               .select('role')
@@ -189,7 +192,6 @@
             this.isLoading = false;
           }
         }
-
       };
     };
   </script>
