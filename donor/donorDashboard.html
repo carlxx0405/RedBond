@@ -2,29 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Donor Dashboard</title>
 
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script type="module" src="../config.js"></script>
 
-  <!-- Alpine.js CDN -->
+  <!-- Alpine.js -->
   <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
-  <!-- Navigo Router CDN -->
+  <!-- Navigo Router -->
   <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
 
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Leaflet Search Plugin -->
+  <!-- Leaflet Geocoder -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="../config.js"></script>
 
   <style>
     #map {
@@ -40,39 +40,50 @@
     function donorDashboard() {
       return {
         username: "",
-        approvedRequests: [
-          { id: 1, hospitalName: "Hope Clinic", location: "Lilongwe", urgency: "High" },
-          { id: 2, hospitalName: "LifeCare Hospital", location: "Blantyre", urgency: "Medium" },
-        ],
-        pendingResponses: [
-          { id: 101, hospitalName: "Saint Mary's", date: "2025-05-01" }
-        ],
+        approvedRequests: [],
+        pendingResponses: [],
         map: null,
-        init: async function () {
 
-          const {
-            data: { user }
-          } = await supabase.auth.getUser();
+        init: async function () {
+          const { data: { user } } = await window.supabase.auth.getUser();
 
           if (user?.email) {
-            const { data, error } = await supabase
+            const { data: userData } = await window.supabase
               .from("users")
               .select("full_name")
               .eq("email", user.email)
               .single();
 
-            if (data?.full_name) {
-              this.username = data.full_name;
+            if (userData?.full_name) {
+              this.username = userData.full_name;
+
+              const { data: requests } = await window.supabase
+                .from("blood_requests")
+                .select("id, hospital_id, hospital_name, urgency, latitude, longitude, status")
+                .eq("status", "approved");
+
+              this.approvedRequests = requests || [];
+
+              const { data: pending } = await window.supabase
+                .from("responses")
+                .select("id, donor_name, responded_at, status")
+                .eq("status", "pending")
+                .eq("donor_name", this.username); // Compare by full name
+
+              this.pendingResponses = pending || [];
+
+              this.initMap();
             }
           }
         },
+
         initMap() {
           if (this.map) return;
 
-          const fallbackCoords = [-13.2543, 34.3015];
+          const defaultCoords = [-13.2543, 34.3015];
           const zoomLevel = 7;
 
-          this.map = L.map('map').setView(fallbackCoords, zoomLevel);
+          this.map = L.map('map').setView(defaultCoords, zoomLevel);
 
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -81,42 +92,37 @@
 
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-              (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
+              (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
                 this.map.setView([lat, lng], 13);
-                L.marker([lat, lng])
-                  .addTo(this.map)
-                  .bindPopup("You are here")
-                  .openPopup();
+                L.marker([lat, lng]).addTo(this.map).bindPopup("Your location").openPopup();
               },
               () => {
-                console.warn("Geolocation permission denied or failed.");
+                console.warn("Geolocation permission denied or unavailable.");
               }
             );
           }
 
-          const locations = {
-            "Hope Clinic": [-13.9626, 33.7741],
-            "LifeCare Hospital": [-15.7861, 35.0085],
-            "Saint Mary's": [-10.2667, 34.2333]
-          };
-
           this.approvedRequests.forEach(req => {
-            const coords = locations[req.hospitalName];
-            if (coords) {
-              L.marker(coords)
+            if (req.latitude && req.longitude) {
+              L.marker([req.latitude, req.longitude])
                 .addTo(this.map)
-                .bindPopup(`<strong>${req.hospitalName}</strong><br/>Location: ${req.location}<br/>Urgency: ${req.urgency}`);
+                .bindPopup(`
+                  <strong>Hospital:</strong> ${req.hospital_name || 'N/A'}<br/>
+                  <strong>Urgency:</strong> ${req.urgency || 'N/A'}<br/>
+                  <strong>Lat:</strong> ${req.latitude}, <strong>Lng:</strong> ${req.longitude}
+                `);
             }
           });
 
-          // Add geocoder control
           L.Control.geocoder().addTo(this.map);
         },
+
         goToMap() {
           router.navigate("/map");
         },
+
         goToDashboard() {
           router.navigate("/");
         }
@@ -126,12 +132,14 @@
     const donorDashboardView = () => `
       <div x-data="donorDashboard()" x-init="init()" class="p-4 space-y-6">
         <h1 class="text-xl sm:text-2xl font-semibold">Hi, <span x-text="username"></span></h1>
+
         <div class="bg-white p-4 rounded shadow-md">
           <h2 class="text-lg font-medium mb-2">What do you want to do?</h2>
           <button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition" @click="goToMap()">
             Donate Blood
           </button>
         </div>
+
         <div>
           <div class="flex justify-between items-center mb-2">
             <h2 class="text-lg font-semibold">Approved Hospital Requests</h2>
@@ -140,22 +148,25 @@
           <div class="space-y-4">
             <template x-for="request in approvedRequests" :key="request.id">
               <div class="bg-white p-4 rounded shadow-sm border">
-                <h3 class="font-bold text-red-600" x-text="request.hospitalName"></h3>
-                <p class="text-sm text-gray-600" x-text="'Location: ' + request.location"></p>
-                <p class="text-sm text-gray-500" x-text="'Urgency: ' + request.urgency"></p>
+                <h3 class="font-bold text-red-600" x-text="request.hospital_name"></h3>
+                <p class="text-sm" x-text="'Request ID: ' + request.id"></p>
+                <p class="text-sm" x-text="'Latitude: ' + request.latitude"></p>
+                <p class="text-sm" x-text="'Longitude: ' + request.longitude"></p>
+                <p class="text-sm" x-text="'Urgency: ' + request.urgency"></p>
               </div>
             </template>
           </div>
         </div>
+
         <div>
           <h2 class="text-lg font-semibold mb-2">Your Pending Responses</h2>
           <template x-if="pendingResponses.length > 0">
             <div class="space-y-3">
               <template x-for="response in pendingResponses" :key="response.id">
                 <div class="bg-white p-4 rounded border shadow-sm">
-                  <h4 class="font-medium text-gray-700" x-text="response.hospitalName"></h4>
-                  <p class="text-sm text-gray-500" x-text="'Request Date: ' + response.date"></p>
-                  <p class="text-sm text-yellow-600">Pending Approval</p>
+                  <h4 class="font-medium text-gray-700" x-text="'Donor Name: ' + response.donor_name"></h4>
+                  <p class="text-sm text-gray-500" x-text="'Response Date: ' + response.responded_at"></p>
+                  <p class="text-sm text-yellow-600" x-text="'Status: ' + response.status"></p>
                 </div>
               </template>
             </div>
@@ -168,7 +179,7 @@
     `;
 
     const donorMapView = () => `
-      <div x-data="donorDashboard()" x-init="initMap()" class="p-4 space-y-4">
+      <div x-data="donorDashboard()" x-init="init()" class="p-4 space-y-4">
         <div class="flex justify-between items-center">
           <h2 class="text-xl font-semibold">Hospital Request Locations</h2>
           <button @click="goToDashboard()" class="text-blue-600 hover:underline text-sm">Hide Map</button>
@@ -179,6 +190,7 @@
 
     const router = new Navigo("/", { hash: true });
     const app = document.getElementById("app");
+    const supabase = window.supabase;
 
     const render = (html) => {
       app.innerHTML = html;
