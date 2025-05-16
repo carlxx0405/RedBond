@@ -118,7 +118,7 @@
                   <form id="donation-form-${req.id}" onsubmit="event.preventDefault(); window.submitDonation('${req.id}', '${req.blood_type}', ${req.units_needed});">
                     <label class="block text-sm font-medium mb-1" for="donor-name-${req.id}">Your Name:</label>
                     <input id="donor-name-${req.id}" name="donor_name" type="text" class="w-full border rounded px-2 py-1 mb-2" required value="${this.username}" />
-                    <button type="submit" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition w-full">Donate All</button>
+                    <button type="submit" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition w-full">Donate</button>
                   </form>
                   <div id="donation-message-${req.id}" class="mt-2 text-sm"></div>
                 </div>
@@ -266,6 +266,16 @@
         render(donorMapView());
       })
       .resolve();
+
+      window.addEventListener("DOMContentLoaded", () => {
+      const currentHash = window.location.hash;
+      if (!currentHash || currentHash === "#/") {
+        router.navigate("/");
+      } else {
+        router.resolve();
+      }
+      router.updatePageLinks();
+    });
   </script>
 </body>
 </html>
