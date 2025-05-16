@@ -186,7 +186,7 @@
       const { data: active, error: err2 } = await supabase
         .from('blood_requests')
         .select('*')
-        .eq('status', 'active');
+        .eq('status', 'approved');
   
       const { data: scheduled, error: err3 } = await supabase
         .from('blood_requests')
