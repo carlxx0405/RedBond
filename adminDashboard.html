@@ -8,7 +8,7 @@
   <script src="https://unpkg.com/alpinejs" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://kit.fontawesome.com/244af82459.js" crossorigin="anonymous"></script>
-  <script type="module" src="../config.js"></script> <!-- Supabase client -->
+  <script type="module" src="../config.js"></script>
 </head>
 
 <body class="h-full flex">
@@ -31,7 +31,6 @@
     <section x-show="tab === 'dashboard'" x-transition>
       <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
 
-      <!-- Cards -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white p-4 rounded shadow">
           <h3 class="text-sm text-red-500">Total Pending Requests</h3>
@@ -51,7 +50,6 @@
         </div>
       </div>
 
-      <!-- Charts Section -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div class="bg-white p-4 rounded shadow">
           <h4 class="font-semibold mb-2">Donor Summary</h4>
@@ -68,7 +66,6 @@
     <section x-show="tab === 'requests'" x-transition>
       <h2 class="text-2xl font-semibold mb-4">Blood Requests</h2>
 
-      <!-- Approve/Reject Table -->
       <div class="bg-white p-4 rounded shadow mb-6">
         <h4 class="font-semibold mb-2">Incoming Requests</h4>
         <table class="w-full text-sm text-left">
@@ -80,21 +77,16 @@
               <th class="p-2">Action</th>
             </tr>
           </thead>
-          <tbody id="bloodRequestsTbody">
-            <!-- row data from database -->
-          </tbody>
+          <tbody id="bloodRequestsTbody"></tbody>
         </table>
       </div>
 
-      <!-- Active Responses Table with Scheduler -->
       <div class="bg-white p-4 rounded shadow">
-        <!-- Active Responses Table with Scheduler and Approve Button -->
-    <div class="bg-white p-4 rounded shadow">
         <h4 class="font-semibold mb-2">Active Responses</h4>
         <div class="overflow-x-auto">
-        <table class="w-full text-sm text-left">
+          <table class="w-full text-sm text-left">
             <thead>
-            <tr class="bg-gray-50 text-gray-600">
+              <tr class="bg-gray-50 text-gray-600">
                 <th class="p-2">ID</th>
                 <th class="p-2">Hospital</th>
                 <th class="p-2">Blood Type</th>
@@ -102,32 +94,12 @@
                 <th class="p-2">Location</th>
                 <th class="p-2">Scheduled Time</th>
                 <th class="p-2">Action</th>
-            </tr>
+              </tr>
             </thead>
-            <tbody id="approvedRequestsTbody">
-            <!-- <tr class="border-b hover:bg-gray-50">
-                <td class="p-2">HealthCare Plus</td>
-                <td class="p-2">John Doe</td>
-                <td class="p-2">O+</td>
-                <td class="p-2">Lilongwe</td>
-                <td class="p-2">
-                <input type="datetime-local" class="border rounded p-1" />
-                </td>
-                <td class="p-2">
-                <button
-                    class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                    @click="approveSchedule(/* add your logic */)"
-                >
-                    Approve
-                </button>
-                </td>
-            </tr> -->
-            <!-- You can loop more rows here using Alpine.js or JS fetch -->
-            </tbody>
-        </table>
-    </div>
-  </div>
-  
+            <tbody id="approvedRequestsTbody"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- INVENTORY -->
@@ -135,13 +107,11 @@
       <h2 class="text-2xl font-semibold mb-4">Inventory</h2>
 
       <div class="grid gap-6">
-        <!-- Remote Blood Units -->
         <div class="bg-white p-4 rounded shadow">
           <h4 class="font-semibold mb-2">Remote Blood Units (Filtered by Hospital)</h4>
           <canvas id="remoteInventoryChart"></canvas>
         </div>
 
-        <!-- Blood Units -->
         <div class="bg-white p-4 rounded shadow">
           <h4 class="font-semibold mb-2">Local Blood Units</h4>
           <canvas id="mbtsInventoryChart"></canvas>
@@ -157,9 +127,7 @@
 
   </main>
 
-  <!-- Chart Init Scripts -->
   <script>
-
     const ctx3 = document.getElementById('remoteInventoryChart');
     new Chart(ctx3, {
       type: 'line',
@@ -179,196 +147,105 @@
     });
   </script>
 </body>
+
 <script type="module">
-    
-  
-    // Fetch and populate dashboard stats
-    async function loadDashboardStats() {
-      const { data: pending, error: err1 } = await supabase
+  import { supabase } from '../config.js';
+
+  async function loadDashboardStats() {
+    const statuses = ['pending', 'active', 'scheduled', 'fulfilled'];
+    const selectors = document.querySelectorAll('p.text-2xl');
+
+    for (let i = 0; i < statuses.length; i++) {
+      const { data, error } = await supabase
         .from('blood_requests')
         .select('*')
-        .eq('status', 'pending');
-  
-      const { data: active, error: err2 } = await supabase
-        .from('blood_requests')
-        .select('*')
-        .eq('status', 'active');
-  
-      const { data: scheduled, error: err3 } = await supabase
-        .from('blood_requests')
-        .select('*')
-        .eq('status', 'scheduled');
-  
-      const { data: fulfilled, error: err4 } = await supabase
-        .from('blood_requests')
-        .select('*')
-        .eq('status', 'fulfilled');
-  
-      document.querySelectorAll('p.text-2xl')[0].textContent = pending?.length ?? 0;
-      document.querySelectorAll('p.text-2xl')[1].textContent = active?.length ?? 0;
-      document.querySelectorAll('p.text-2xl')[2].textContent = scheduled?.length ?? 0;
-      document.querySelectorAll('p.text-2xl')[3].textContent = fulfilled?.length ?? 0;
+        .eq('status', statuses[i]);
+
+      selectors[i].textContent = data?.length ?? 0;
     }
+  }
 
+  async function loadBloodRequests() {
+  const { data: requests, error } = await supabase
+    .from('blood_requests')
+    .select('id, blood_type, hospital_name')
+    .eq('status', 'pending');
 
-// Fix this scope
-// async function loadPendingResponses() {
-//   const { data: responses, error } = await supabase
-//     .from('responses')
-//     .select('id, name, blood_type, hospital_id, donor_id, location') // Adjust if needed
-//     .eq('status', 'pending');
+  const tbody = document.getElementById("bloodRequestsTbody");
+  if (!tbody) return;
 
-//   if (error) {
-//     console.error("❌ Error fetching pending responses:", error);
-//     return;
-//   }
+  tbody.innerHTML = "";
 
-//   const tbody = document.getElementById("approvedRequestsTbody");
-//   if (!tbody) {
-//     console.warn("⚠️ Table body with ID 'approvedRequestsTbody' not found.");
-//     return;
-//   }
+  if (!Array.isArray(requests)) {
+    console.error("Invalid response or no data for pending requests");
+    return;
+  }
 
-//   tbody.innerHTML = "";
+  for (let i = 0; i < requests.length; i++) {
+    const req = requests[i];
 
-//   responses.forEach(res => {
-//     const row = document.createElement("tr");
-//     row.className = "border-b hover:bg-gray-50";
+    const row = document.createElement('tr');
+    row.className = 'border-b';
 
-//     row.innerHTML = `
-//       <td class="p-2">${res.hospital_id || "Unknown Hospital"}</td>
-//       <td class="p-2">${res.name || "No Name"}</td>
-//       <td class="p-2">${res.blood_type}</td>
-//       <td class="p-2">${res.donor_id || "N/A"}</td>
-//       <td class="p-2">${res.location || "Unknown"}</td>
-//       <td class="p-2">
-//         <input type="datetime-local" class="border rounded p-1" />
-//       </td>
-//       <td class="p-2">
-//         <button
-//           class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-//           onclick="approveSchedule('${res.id}', '${res.hospital_id}', this)"
-//         >
-//           Approve
-//         </button>
-//       </td>
-//     `;
-//     tbody.appendChild(row);
-//   });
-// }
+    row.innerHTML = `
+      <td class="p-2">#${req.id}</td>
+      <td class="p-2">${req.hospital_name}</td>
+      <td class="p-2">${req.blood_type}</td>
+      <td class="p-2 space-x-2">
+        <button class="approve-btn px-3 py-1 bg-green-500 text-white rounded">Approve</button>
+      </td>
+    `;
 
+    tbody.appendChild(row);
 
-  
-    // Populate Blood Requests Table
-    async function loadBloodRequests() {
-    const { data: requests, error } = await supabase
+    row.querySelector('.approve-btn').addEventListener('click', async () => {
+      const { error: updateError } = await supabase
         .from('blood_requests')
-        .select('id, blood_type, name')
-        .eq('status', 'pending');
+        .update({ status: 'approved' })
+        .eq('id', req.id);
 
-    const tbody = document.getElementById("bloodRequestsTbody");
-
-    if (!tbody) {
-        console.warn("Could not find tbody for blood requests.");
-        return;
-    }
-
-    tbody.innerHTML = "";
-
-    requests.forEach(req => {
-        const row = document.createElement('tr');
-        row.className = 'border-b';
-
-        row.innerHTML = `
-            <td class="p-2">#${req.id}</td>
-            <td class="p-2">${req.name}</td>
-            <td class="p-2">${req.blood_type}</td>
-            <td class="p-2 space-x-2">
-                <button class="approve-btn px-3 py-1 bg-green-500 text-white rounded">Approve</button>
-                <button class="reject-btn px-3 py-1 bg-red-500 text-white rounded">Reject</button>
-            </td>
-        `;
-
-        // Append row first so querySelector works
-        tbody.appendChild(row);
-
-        // Add event listeners
-        const approveBtn = row.querySelector('.approve-btn');
-        const rejectBtn = row.querySelector('.reject-btn');
-
-        approveBtn.addEventListener('click', async () => {
-            const { error } = await supabase
-                .from('blood_requests')
-                .update({ status: 'approved' })
-                .eq('id', req.id);
-
-            if (error) {
-                alert("Error approving request: " + error.message);
-            } else {
-                alert("Request approved.");
-                loadBloodRequests(); // Refresh the list
-            }
-        });
-
-        rejectBtn.addEventListener('click', async () => {
-            const { error } = await supabase
-                .from('blood_requests')
-                .update({ status: 'rejected' })
-                .eq('id', req.id);
-
-            if (error) {
-                alert("Error rejecting request: " + error.message);
-            } else {
-                alert("Request rejected.");
-                loadBloodRequests(); // Refresh the list
-            }
-        });
-    });
-}
-
-
-  
-    // Example: Fetch data for Donor Chart
-    async function loadDonorChart() {
-      const { data: donors } = await supabase.from('users').select('blood_type');
-  
-      const countMap = {};
-      for (const donor of donors) {
-        const type = donor.blood_type;
-        countMap[type] = (countMap[type] || 0) + 1;
+      if (updateError) {
+        alert("❌ Error: " + updateError.message);
+      } else {
+        alert("✅ Approved!");
+        loadBloodRequests();
+        loadDashboardStats();
       }
-  
-      const ctx = document.getElementById('donorChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(countMap),
-          datasets: [{
-            data: Object.values(countMap),
-            backgroundColor: ['#34244f', '#facc15', '#60a5fa', '#f87171', '#34d399']
-          }]
-        }
-      });
-    }
-
-    async function loadHospitalCard() {
-  const { data: hospitals } = await supabase.from('hospital_users').select();
-  const total = hospitals.length;
-
-  const container = document.getElementById('hospitalCard');
-  container.innerHTML = `
-    <div style="padding: 1.5rem; background: #facc15; color: #1e1b4b; border-radius: 1rem; font-size: 1.5rem; text-align: center;">
-      <strong>${total}</strong> Hospitals Registered
-    </div>
-  `;
+    });
+  }
 }
 
-  
-    // Init
-    loadDashboardStats();
-    loadBloodRequests();
-    loadDonorChart();
-    loadHospitalCard();
-    loadPendingResponses();
-  </script>  
+
+  async function loadDonorChart() {
+    const { data: donors } = await supabase.from('users').select('blood_type');
+    const countMap = {};
+    donors.forEach(d => countMap[d.blood_type] = (countMap[d.blood_type] || 0) + 1);
+
+    const ctx = document.getElementById('donorChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(countMap),
+        datasets: [{
+          data: Object.values(countMap),
+          backgroundColor: ['#34244f', '#facc15', '#60a5fa', '#f87171', '#34d399']
+        }]
+      }
+    });
+  }
+
+  async function loadHospitalCard() {
+    const { data: hospitals } = await supabase.from('hospital_users').select();
+    document.getElementById('hospitalCard').innerHTML = `
+      <div style="padding: 1.5rem; background: #facc15; color: #1e1b4b; border-radius: 1rem; font-size: 1.5rem; text-align: center;">
+        <strong>${hospitals.length}</strong> Hospitals Registered
+      </div>
+    `;
+  }
+
+  loadDashboardStats();
+  loadBloodRequests();
+  loadDonorChart();
+  loadHospitalCard();
+</script>
 </html>

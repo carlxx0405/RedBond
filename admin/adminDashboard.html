@@ -97,7 +97,7 @@
             <tr class="bg-gray-50 text-gray-600">
                 <th class="p-2">ID</th>
                 <th class="p-2">Request ID</th>
-                <th class="p-2">Donor ID</th>
+                <th class="p-2">Donor Name</th>
                 <th class="p-2">Scheduled Time</th>
                 <th class="p-2">Action</th>
             </tr>
@@ -144,10 +144,15 @@
     </section>
 
     <!-- LOGOUT -->
-    <section x-show="tab === 'logout'" x-transition>
-      <h2 class="text-2xl font-semibold mb-4 text-red-500">Confirm Logout</h2>
-      <button class="px-4 py-2 bg-red-500 text-white rounded">Logout</button>
-    </section>
+<section x-show="tab === 'logout'" x-transition>
+  <h2 class="text-2xl font-semibold mb-4 text-red-500">Confirm Logout</h2>
+  <button 
+    class="px-4 py-2 bg-red-500 text-white rounded" 
+    id="logoutBtn">
+    Logout
+  </button>
+</section>
+
 
   </main>
 
@@ -186,7 +191,7 @@
       const { data: active, error: err2 } = await supabase
         .from('blood_requests')
         .select('*')
-        .eq('status', 'active');
+        .eq('status', 'approved');
   
       const { data: scheduled, error: err3 } = await supabase
         .from('blood_requests')
@@ -209,7 +214,7 @@
 async function loadPendingResponses() {
   const { data: responses, error } = await supabase
     .from('responses')
-    .select('id, request_id, donor_id')
+    .select('id, request_id, donor_id, donor_name')
     .eq('status', 'pending');
 
   if (error) {
@@ -233,7 +238,7 @@ async function loadPendingResponses() {
     row.innerHTML = `
       <td class="p-2">${res.id || "Unknown ID"}</td>
       <td class="p-2">${res.request_id || "No Request"}</td>
-      <td class="p-2">${res.donor_id || "No Donor"}</td>
+      <td class="p-2">${res.donor_name || "No Donor"}</td>
       <td class="p-2">
         <input type="datetime-local" id="${inputId}" class="border rounded p-1" />
       </td>
@@ -290,70 +295,55 @@ async function loadPendingResponses() {
   
     // Populate Blood Requests Table
     async function loadBloodRequests() {
-    const { data: requests, error } = await supabase
+  const { data: requests, error } = await supabase
+    .from('blood_requests')
+    .select('id, blood_type, hospital_name')
+    .eq('status', 'pending');
+
+  const tbody = document.getElementById("bloodRequestsTbody");
+  if (!tbody) return;
+
+  tbody.innerHTML = "";
+
+  if (!Array.isArray(requests)) {
+    console.error("Invalid response or no data for pending requests");
+    return;
+  }
+
+  for (let i = 0; i < requests.length; i++) {
+    const req = requests[i];
+
+    const row = document.createElement('tr');
+    row.className = 'border-b';
+
+    row.innerHTML = `
+      <td class="p-2">#${req.id}</td>
+      <td class="p-2">${req.hospital_name}</td>
+      <td class="p-2">${req.blood_type}</td>
+      <td class="p-2 space-x-2">
+        <button class="approve-btn px-3 py-1 bg-green-500 text-white rounded">Approve</button>
+      </td>
+    `;
+
+    tbody.appendChild(row);
+
+    row.querySelector('.approve-btn').addEventListener('click', async () => {
+      const { error: updateError } = await supabase
         .from('blood_requests')
-        .select('id, blood_type, name')
-        .eq('status', 'pending');
+        .update({ status: 'approved' })
+        .eq('id', req.id);
 
-    const tbody = document.getElementById("bloodRequestsTbody");
-
-    if (!tbody) {
-        console.warn("Could not find tbody for blood requests.");
-        return;
-    }
-
-    tbody.innerHTML = "";
-
-    requests.forEach(req => {
-        const row = document.createElement('tr');
-        row.className = 'border-b';
-
-        row.innerHTML = `
-            <td class="p-2">#${req.id}</td>
-            <td class="p-2">${req.name}</td>
-            <td class="p-2">${req.blood_type}</td>
-            <td class="p-2 space-x-2">
-                <button class="approve-btn px-3 py-1 bg-green-500 text-white rounded">Approve</button>
-                <button class="reject-btn px-3 py-1 bg-red-500 text-white rounded">Reject</button>
-            </td>
-        `;
-
-        // Append row first so querySelector works
-        tbody.appendChild(row);
-
-        // Add event listeners
-        const approveBtn = row.querySelector('.approve-btn');
-        const rejectBtn = row.querySelector('.reject-btn');
-
-        approveBtn.addEventListener('click', async () => {
-            const { error } = await supabase
-                .from('blood_requests')
-                .update({ status: 'approved' })
-                .eq('id', req.id);
-
-            if (error) {
-                alert("Error approving request: " + error.message);
-            } else {
-                alert("Request approved.");
-                loadBloodRequests(); // Refresh the list
-            }
-        });
-
-        rejectBtn.addEventListener('click', async () => {
-            const { error } = await supabase
-                .from('blood_requests')
-                .update({ status: 'rejected' })
-                .eq('id', req.id);
-
-            if (error) {
-                alert("Error rejecting request: " + error.message);
-            } else {
-                alert("Request rejected.");
-                loadBloodRequests(); // Refresh the list
-            }
-        });
+      if (updateError) {
+        alert("❌ Error: " + updateError.message);
+      } else {
+        alert("✅ Approved!");
+        loadBloodRequests();
+        loadDashboardStats();
+      }
     });
+  }
 }
+
     // Example: Fetch data for Donor Chart
     async function loadDonorChart() {
       const { data: donors } = await supabase.from('users').select('blood_type');
@@ -523,6 +513,22 @@ async function loadPendingResponses() {
     </div>
   `;
 }
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    alert("Logout failed: " + error.message);
+  } else {
+    // Optional: Clear local/session storage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Redirect to login page
+    window.location.href = '../index.html';  // Adjust path as needed
+  }
+});
+
 
   
     // Init
